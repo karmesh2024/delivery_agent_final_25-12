@@ -35,7 +35,7 @@
     "build/types/**/*.ts",
     "next-env.d.ts",
     "out/types/**/*.ts"
-, "src/domains/supplier-management/services/priceOfferService.ts.new"  ],
+  ],
   "exclude": [
     "node_modules"
   ]
