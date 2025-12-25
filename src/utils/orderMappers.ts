@@ -1,5 +1,4 @@
-```typescript
-import { DeliveryOrder, Order, OrderItem, OrderStatus } from '@/types';
+import { DeliveryOrder, Order, OrderItem, OrderStatus } from "@/types";
 
 /**
  * تحويل كائن DeliveryOrder من قاعدة البيانات إلى كائن Order

@@ -298,13 +298,7 @@ export interface OrderDetailItem {
 
 export interface Order {
   id: string;
-  status:
-    | "pending"
-    | "confirmed"
-    | "in_progress"
-    | "delivered"
-    | "canceled"
-    | "completed";
+  status: OrderStatus;
   created_at: string;
   updated_at: string;
   customer_name: string;
