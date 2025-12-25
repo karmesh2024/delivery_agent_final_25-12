@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/sha
 import { Button } from "@/shared/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { DirectApiAddAgentForm } from "@/domains/agents/components";
+import { DirectApiAddAgentForm } from "@/components";
 import { useToast } from "@/shared/ui/toast";
 
 export default function DirectAddAgentPage() {

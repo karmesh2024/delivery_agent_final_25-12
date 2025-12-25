@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/sha
 import { Button } from "@/shared/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { FullAddAgentForm, UploadAgentDocuments, AgentZonesManager, AgentSummary } from "@/domains/agents/components";
+import { FullAddAgentForm, UploadAgentDocuments, AgentZonesManager, AgentSummary } from "@/components";
 import { useToast } from "@/shared/ui/toast";
 
 export default function AddNewAgentPage() {
@@ -14,9 +14,13 @@ export default function AddNewAgentPage() {
   const { toast } = useToast();
   const [currentTab, setCurrentTab] = useState("basic-info");
   const [agentId, setAgentId] = useState<string | null>(null);
+  const [deliveryCode, setDeliveryCode] = useState<string | null>(null);
+  const [passwordSetByAdmin, setPasswordSetByAdmin] = useState<string | null>(null);
   
-  const handleAgentCreated = (id: string) => {
+  const handleAgentCreated = (id: string, code: string, password: string) => {
     setAgentId(id);
+    setDeliveryCode(code);
+    setPasswordSetByAdmin(password);
     toast({
       title: "تم إنشاء المندوب بنجاح",
       description: "يمكنك الآن إضافة المستندات ومناطق العمل",
@@ -110,6 +114,9 @@ export default function AddNewAgentPage() {
               {agentId ? (
                 <AgentSummary 
                   agentId={agentId} 
+                  deliveryCode={deliveryCode}
+                  passwordSetByAdmin={passwordSetByAdmin}
+                  onComplete={() => router.push("/agents")}
                   onBack={() => setCurrentTab("zones")}
                 />
               ) : (
