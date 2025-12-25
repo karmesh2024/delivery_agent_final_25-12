@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { Button } from "@/shared/ui/button";
-import { Input } from "@/shared/ui/input";
-import { Label } from "@/shared/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
+import { Button } from "@/shared/ui";
+import { Input } from "@/shared/ui";
+import { Label } from "@/shared/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui";
 import { 
   Dialog, 
   DialogContent, 
@@ -16,7 +16,7 @@ import {
 } from "../shared/ui/dialog";
 import { AgentStatus } from "@/types";
 import { createDeliveryBoy } from "@/lib/supabase";
-import { useToast } from "@/shared/ui/toast";
+import { useToast } from "@/shared/ui";
 
 // تعريف نوع البيانات للمندوب الجديد
 interface NewAgentData {
@@ -274,4 +274,4 @@ export function AddAgentDialog({
   );
 }
 
-export default AddAgentDialog; 
+export default AddAgentDialog;

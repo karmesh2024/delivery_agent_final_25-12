@@ -18,6 +18,9 @@ import {
 } from '@/shared/components/ui/card';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 
+/**
+ * Component that uses useSearchParams - must be wrapped in Suspense
+ */
 function RegisterForm() {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
@@ -178,11 +181,19 @@ function RegisterForm() {
   );
 }
 
+/**
+ * صفحة التسجيل
+ * تسمح للمستخدمين الجدد بالتسجيل في النظام
+ */
 export default function RegisterPage() {
   return (
     <Suspense fallback={
       <div className="container flex items-center justify-center min-h-screen">
-        جاري التحميل...
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <div className="text-center">جاري التحميل...</div>
+          </CardContent>
+        </Card>
       </div>
     }>
       <RegisterForm />
