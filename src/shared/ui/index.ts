@@ -7,8 +7,20 @@ export * from './button';
 export * from './card';
 export * from './checkbox';
 // export * from './collapsible'; // Removed - package not installed
-export * from './custom-dialog';
+
+// Export custom-dialog but rename conflicting exports
+export {
+  CustomDialog,
+  CustomDialogContent,
+  CustomDialogHeader,
+  CustomDialogTitle,
+  CustomDialogDescription,
+  CustomDialogFooter as CustomDialogFooterComponent
+} from './custom-dialog';
+
+// Export dialog components
 export * from './dialog';
+
 export * from './dropdown-menu';
 export * from './enhanced-dropdown';
 export * from './form';
@@ -22,8 +34,24 @@ export * from './switch';
 export * from './table';
 export * from './tabs';
 export * from './textarea';
-export * from './toast';
+
+// Export toast but avoid conflicts with use-toast
+export { 
+  Toast,
+  ToastAction,
+  ToastClose,
+  ToastDescription,
+  ToastProvider,
+  ToastTitle,
+  ToastViewport,
+  Toaster,
+  type ToastActionElement,
+  type ToastProps
+} from './toast';
+
+// Export use-toast hook
+export { useToast, toast } from './use-toast';
+
 export * from './tooltip';
 export * from './universal-dialog';
-export * from './use-toast';
 export * from './color-input';
