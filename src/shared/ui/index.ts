@@ -1,4 +1,4 @@
-// Export all UI components
+// Export all UI components - only export what actually exists
 export * from './alert';
 export * from './alert-dialog';
 export * from './avatar';
@@ -6,19 +6,11 @@ export * from './badge';
 export * from './button';
 export * from './card';
 export * from './checkbox';
-// export * from './collapsible'; // Removed - package not installed
 
-// Export custom-dialog but rename conflicting exports
-export {
-  CustomDialog,
-  CustomDialogContent,
-  CustomDialogHeader,
-  CustomDialogTitle,
-  CustomDialogDescription,
-  CustomDialogFooter as CustomDialogFooterComponent
-} from './custom-dialog';
+// Don't export custom-dialog - it has conflicts and we use dialog instead
+// export * from './custom-dialog';
 
-// Export dialog components
+// Export dialog components (these are what we actually use)
 export * from './dialog';
 
 export * from './dropdown-menu';
@@ -35,22 +27,11 @@ export * from './table';
 export * from './tabs';
 export * from './textarea';
 
-// Export toast but avoid conflicts with use-toast
-export { 
-  Toast,
-  ToastAction,
-  ToastClose,
-  ToastDescription,
-  ToastProvider,
-  ToastTitle,
-  ToastViewport,
-  Toaster,
-  type ToastActionElement,
-  type ToastProps
-} from './toast';
+// Export only what exists in toast.tsx
+export { ToastProvider, toast, useToast } from './toast';
 
-// Export use-toast hook
-export { useToast, toast } from './use-toast';
+// Export use-toast separately to avoid conflicts
+export type { ToastActionElement, ToastProps } from './use-toast';
 
 export * from './tooltip';
 export * from './universal-dialog';
