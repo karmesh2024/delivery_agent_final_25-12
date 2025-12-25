@@ -10,7 +10,7 @@ const nextConfig = {
     // استخدام optimizePackageImports لتحسين الأداء
     optimizePackageImports: ['@headlessui/react'],
     // تكوين Turbopack بشكل صحيح
-    turbo: {
+    turbopack: {
       rules: {
         // تكوين قواعد Turbopack إذا لزم الأمر
       }
@@ -115,9 +115,19 @@ const nextConfig = {
       }
     ]
   },
-  webpack(config) {
+  webpack(config, { isServer }) {
     // إضافة دعم للقماشة (canvas) لحل مشاكل التوافق مع Leaflet
     config.externals = [...(config.externals || []), { canvas: "canvas" }];
+    
+    // Fix module resolution for TypeScript files
+    config.resolve = {
+      ...config.resolve,
+      extensions: ['.tsx', '.ts', '.jsx', '.js', '.json'],
+      extensionAlias: {
+        '.js': ['.tsx', '.ts', '.jsx', '.js'],
+      }
+    };
+    
     return config;
   },
 };
