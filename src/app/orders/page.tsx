@@ -187,11 +187,11 @@ export default function OrdersPage() {
       >
         <div className="space-y-8">
           {/* Header with Page Title and Description */}
-          <div className="bg-gradient-to-l from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 p-6 rounded-lg shadow-sm border border-blue-100 dark:border-blue-900">
+          <div className="bg-card text-card-foreground p-6 rounded-lg shadow-sm border border-border">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
               <div>
-                <h1 className="text-3xl font-bold flex items-center text-blue-800 dark:text-blue-300">
-                  <FiFileText className="mr-3 h-7 w-7 text-blue-600 dark:text-blue-400" />
+                <h1 className="text-3xl font-bold flex items-center text-foreground">
+                  <FiFileText className="mr-3 h-7 w-7 text-primary" />
                   طلبات التوصيل
                 </h1>
                 <p className="text-sm text-blue-700/70 dark:text-blue-400/70 mt-2 max-w-xl">
@@ -205,7 +205,7 @@ export default function OrdersPage() {
                   <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-500" />
                   <Input 
                     placeholder="بحث عن طلبات..."
-                    className="pl-10 pr-4 border-blue-200 dark:border-blue-800 focus:border-blue-500 min-w-[240px] bg-white/90 dark:bg-slate-900/90"
+                    className="pl-10 pr-4 border-input focus:border-primary min-w-[240px] bg-background"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -215,7 +215,7 @@ export default function OrdersPage() {
                 <Button 
                   variant="outline" 
                   onClick={() => setViewType(viewType === 'grid' ? 'table' : 'grid')}
-                  className="gap-1 border-blue-200 hover:bg-blue-100 text-blue-700 dark:border-blue-800 dark:hover:bg-blue-900 dark:text-blue-300"
+                  className="gap-1"
                   title={viewType === 'grid' ? 'عرض جدولي' : 'عرض شبكي'}
                 >
                   {viewType === 'grid' ? (
@@ -267,43 +267,43 @@ export default function OrdersPage() {
           
           {/* Stats Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-lg border border-green-100 dark:border-green-900 flex items-center justify-between">
+            <div className="bg-card text-card-foreground p-4 rounded-lg border border-border flex items-center justify-between">
               <div>
-                <p className="text-sm text-green-700 dark:text-green-400">تم التوصيل</p>
-                <p className="text-2xl font-bold text-green-800 dark:text-green-300">{stats.delivered}</p>
+                <p className="text-sm text-muted-foreground">تم التوصيل</p>
+                <p className="text-2xl font-bold text-foreground">{stats.delivered}</p>
               </div>
-              <div className="bg-green-100 dark:bg-green-800/50 p-3 rounded-full">
-                <FiCheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <div className="bg-emerald-500/10 p-3 rounded-full">
+                <FiCheckCircle className="h-6 w-6 text-emerald-500" />
               </div>
             </div>
             
-            <div className="bg-yellow-50 dark:bg-yellow-900/30 p-4 rounded-lg border border-yellow-100 dark:border-yellow-900 flex items-center justify-between">
+            <div className="bg-card text-card-foreground p-4 rounded-lg border border-border flex items-center justify-between">
               <div>
-                <p className="text-sm text-yellow-700 dark:text-yellow-400">قيد الانتظار</p>
-                <p className="text-2xl font-bold text-yellow-800 dark:text-yellow-300">{stats.pending}</p>
+                <p className="text-sm text-muted-foreground">قيد الانتظار</p>
+                <p className="text-2xl font-bold text-foreground">{stats.pending}</p>
               </div>
-              <div className="bg-yellow-100 dark:bg-yellow-800/50 p-3 rounded-full">
-                <FiPackage className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+              <div className="bg-amber-500/10 p-3 rounded-full">
+                <FiPackage className="h-6 w-6 text-amber-500" />
               </div>
             </div>
             
-            <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg border border-blue-100 dark:border-blue-900 flex items-center justify-between">
+            <div className="bg-card text-card-foreground p-4 rounded-lg border border-border flex items-center justify-between">
               <div>
-                <p className="text-sm text-blue-700 dark:text-blue-400">قيد التنفيذ</p>
-                <p className="text-2xl font-bold text-blue-800 dark:text-blue-300">{stats.in_progress}</p>
+                <p className="text-sm text-muted-foreground">قيد التنفيذ</p>
+                <p className="text-2xl font-bold text-foreground">{stats.in_progress}</p>
               </div>
-              <div className="bg-blue-100 dark:bg-blue-800/50 p-3 rounded-full">
-                <FiTruck className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <div className="bg-blue-500/10 p-3 rounded-full">
+                <FiTruck className="h-6 w-6 text-blue-500" />
               </div>
             </div>
             
-            <div className="bg-purple-50 dark:bg-purple-900/30 p-4 rounded-lg border border-purple-100 dark:border-purple-900 flex items-center justify-between">
+            <div className="bg-card text-card-foreground p-4 rounded-lg border border-border flex items-center justify-between">
               <div>
-                <p className="text-sm text-purple-700 dark:text-purple-400">إجمالي الطلبات</p>
-                <p className="text-2xl font-bold text-purple-800 dark:text-purple-300">{stats.total}</p>
+                <p className="text-sm text-muted-foreground">إجمالي الطلبات</p>
+                <p className="text-2xl font-bold text-foreground">{stats.total}</p>
               </div>
-              <div className="bg-purple-100 dark:bg-purple-800/50 p-3 rounded-full">
-                <FiShoppingBag className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              <div className="bg-purple-500/10 p-3 rounded-full">
+                <FiShoppingBag className="h-6 w-6 text-purple-500" />
               </div>
             </div>
           </div>
@@ -320,8 +320,8 @@ export default function OrdersPage() {
           ) : null}
           
           {/* Order Tabs */}
-          <div className="bg-white dark:bg-slate-900 rounded-lg p-4 shadow-sm border border-gray-100 dark:border-gray-800">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-200">تصفية الطلبات حسب الحالة</h2>
+          <div className="bg-card text-card-foreground rounded-lg p-4 shadow-sm border border-border">
+            <h2 className="text-lg font-semibold mb-4 text-foreground">تصفية الطلبات حسب الحالة</h2>
             <FilterTabs
               items={orderTabs}
               activeTab={activeTab}
@@ -330,7 +330,7 @@ export default function OrdersPage() {
           </div>
 
           {/* Orders List */}
-          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+          <div className="bg-card text-card-foreground rounded-lg shadow-sm border border-border p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 flex items-center">
                 <FiShoppingBag className="h-5 w-5 text-purple-600 mr-2" />
