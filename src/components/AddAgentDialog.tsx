@@ -13,7 +13,7 @@ import {
   DialogTitle, 
   DialogDescription,
   DialogFooter
-} from "@/shared/ui/dialog";
+} from "../shared/ui/dialog";
 import { AgentStatus } from "@/types";
 import { createDeliveryBoy } from "@/lib/supabase";
 import { useToast } from "@/shared/ui/toast";
