@@ -9,12 +9,6 @@ const nextConfig = {
   experimental: {
     // استخدام optimizePackageImports لتحسين الأداء
     optimizePackageImports: ['@headlessui/react'],
-    // تكوين Turbopack بشكل صحيح
-    turbopack: {
-      rules: {
-        // تكوين قواعد Turbopack إذا لزم الأمر
-      }
-    }
   },
   
   // تحديد مسار المجلدات الخاصة بالتطبيق
