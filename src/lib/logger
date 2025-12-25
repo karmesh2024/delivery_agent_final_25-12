@@ -1,0 +1,118 @@
+/**
+ * نظام لوجر آمن للإنتاج
+ * يحل محل console.log ويمنع تسريب المعلومات الحساسة
+ */
+
+// مستويات اللوج
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+// إعداد اللوجر
+class ProductionLogger {
+  private isDevelopment = process.env.NODE_ENV === 'development';
+  private logLevel: LogLevel = this.isDevelopment ? 'debug' : 'info';
+
+  private shouldLog(level: LogLevel): boolean {
+    const levels: LogLevel[] = ['debug', 'info', 'warn', 'error'];
+    return levels.indexOf(level) >= levels.indexOf(this.logLevel);
+  }
+
+  private formatMessage(level: LogLevel, message: string, ...args: unknown[]): string {
+    const timestamp = new Date().toISOString();
+    return `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+  }
+
+  debug(message: string, ...args: unknown[]) {
+    if (this.shouldLog('debug')) {
+      console.debug(this.formatMessage('debug', message), ...args);
+    }
+  }
+
+  info(message: string, ...args: unknown[]) {
+    if (this.shouldLog('info')) {
+      console.info(this.formatMessage('info', message), ...args);
+    }
+  }
+
+  warn(message: string, ...args: unknown[]) {
+    if (this.shouldLog('warn')) {
+      console.warn(this.formatMessage('warn', message), ...args);
+    }
+  }
+
+  error(message: string, ...args: unknown[]) {
+    if (this.shouldLog('error')) {
+      console.error(this.formatMessage('error', message), ...args);
+    }
+  }
+
+  // دالة خاصة للتنبيهات الأمنية
+  security(message: string, ...args: unknown[]) {
+    console.error(this.formatMessage('error', `🔒 SECURITY: ${message}`), ...args);
+  }
+
+  // دالة للعمليات الحساسة
+  sensitive(message: string, ...args: unknown[]) {
+    if (this.isDevelopment) {
+      console.warn(this.formatMessage('warn', `⚠️ SENSITIVE: ${message}`), ...args);
+    }
+  }
+}
+
+// إنشاء instance واحد من اللوجر
+export const logger = new ProductionLogger();
+
+// دوال مساعدة متخصصة
+export const dbLogger = {
+  query: (message: string) => logger.debug(`DB Query: ${message}`),
+  error: (message: string) => logger.error(`DB Error: ${message}`),
+  connection: (status: 'success' | 'failed') => 
+    status === 'success' ? logger.info('DB Connection: OK') : logger.error('DB Connection: FAILED')
+};
+
+export const authLogger = {
+  login: (userId: string) => logger.info(`User logged in: ${userId}`),
+  logout: (userId: string) => logger.info(`User logged out: ${userId}`),
+  error: (message: string) => logger.error(`Auth Error: ${message}`),
+  security: (message: string) => logger.security(`Auth Security: ${message}`)
+};
+
+export const apiLogger = {
+  request: (method: string, url: string) => logger.info(`${method} ${url}`),
+  error: (url: string, error: string) => logger.error(`API Error: ${url} - ${error}`),
+  sensitive: (url: string, data: unknown) => logger.sensitive(`API Sensitive: ${url}`, data)
+};
+
+export const validationLogger = {
+  error: (field: string, value: unknown) => logger.warn(`Validation failed: ${field} = ${value}`),
+  success: (operation: string) => logger.info(`Validation success: ${operation}`)
+};
+
+// دالة لتنظيف البيانات الحساسة قبل اللوج
+export function cleanForLog(data: unknown): unknown {
+  const sensitiveFields = ['password', 'token', 'key', 'secret', 'credential', 'auth'];
+  
+  if (typeof data === 'object' && data !== null) {
+    const cleaned = { ...data as Record<string, unknown> };
+    for (const field of Object.keys(cleaned)) {
+      if (sensitiveFields.some(sensitive => 
+        field.toLowerCase().includes(sensitive.toLowerCase()))) {
+        cleaned[field] = '***HIDDEN***';
+      }
+    }
+    return cleaned;
+  }
+  
+  return data;
+}
+
+// دالة للفحص الآمن للبيئة
+export const envLogger = {
+  check: (key: string, value: string | undefined) => {
+    if (!value) {
+      logger.warn(`Environment variable ${key} is missing`);
+      return false;
+    }
+    logger.info(`Environment variable ${key} is set`);
+    return true;
+  }
+};

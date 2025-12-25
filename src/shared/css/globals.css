@@ -1,0 +1,18 @@
+/* تحسين عرض القوائم المنسدلة فوق النوافذ المنبثقة */
+[data-radix-select-content] {
+  z-index: 9999999 !important;
+  position: relative;
+}
+
+.universal-dialog-backdrop {
+  z-index: 50;
+}
+
+.universal-dialog-content {
+  z-index: 51;
+}
+
+/* لمنع تصادم النوافذ المنسدلة مع الخلفية المعتمة */
+[data-radix-popper-content-wrapper] {
+  z-index: 9999999 !important;
+} 

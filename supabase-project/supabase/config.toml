@@ -1,0 +1,14 @@
+[functions]
+# The directory where your Supabase functions are located
+directory = "functions"
+
+[migrations]
+# The directory where your Supabase migrations are located
+directory = "migrations"
+
+[api]
+# The API URL for your Supabase project
+url = "https://your-project-ref.supabase.co"
+
+# The API key for your Supabase project
+key = "your-anon-key"

@@ -1,0 +1,32 @@
+"use client";
+
+import { useEffect, useState, useRef, useCallback } from "react";
+import { Agent } from "@/types";
+import { Card } from "@/shared/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui/avatar";
+import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
+import { cn } from "@/lib/utils";
+import { VISGoogleMapsComponent } from './VISGoogleMapsComponent';
+import { 
+  getOrderTrackingPoints, 
+  getOrderDetails 
+} from '@/lib/supabase';
+import { Phone, MapPin, Clock, Package, Truck, RefreshCw } from 'lucide-react';
+import { DeliveryLocation } from "../types";
+
+// Replace date-fns formatting with native JS formatting
+const formatTimeToArabic = (timestamp: string | Date) => {
+  try {
+    const date = new Date(timestamp);
+    return new Intl.DateTimeFormat('ar', { 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit',
+      hour12: true
+    }).format(date);
+  } catch (e) {
+    console.error("Error formatting time:", e);
+    return "غير متوفر";
+  }
+}; 
