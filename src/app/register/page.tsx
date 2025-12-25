@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -19,10 +19,9 @@ import {
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 
 /**
- * صفحة التسجيل
- * تسمح للمستخدمين الجدد بالتسجيل في النظام
+ * Component that uses useSearchParams - must be wrapped in Suspense
  */
-export default function RegisterPage() {
+function RegisterForm() {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
@@ -186,5 +185,25 @@ export default function RegisterPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+/**
+ * صفحة التسجيل
+ * تسمح للمستخدمين الجدد بالتسجيل في النظام
+ */
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="container flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <div className="text-center">جاري التحميل...</div>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }
