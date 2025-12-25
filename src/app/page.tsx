@@ -311,7 +311,7 @@ export default function HomePage() {
       title: "Delivery Agents",
       value: agentsFromRedux.length,
       icon: FiUsers,
-      iconClassName: "bg-indigo-100 text-indigo-600",
+      iconClassName: "bg-blue-500/10 text-blue-500",
       change: {
         value: agentStatusCounts.online,
         trend: "neutral"
@@ -321,7 +321,7 @@ export default function HomePage() {
       title: "Avg. Delivery Time",
       value: `${stats.avg_delivery_time} min`,
       icon: FiClock,
-      iconClassName: "bg-blue-100 text-blue-600",
+      iconClassName: "bg-emerald-500/10 text-emerald-500",
       change: {
         value: 5,
         trend: "down"
@@ -331,7 +331,7 @@ export default function HomePage() {
       title: "Pending Orders",
       value: stats.pending,
       icon: FiPackage,
-      iconClassName: "bg-amber-100 text-amber-600",
+      iconClassName: "bg-amber-500/10 text-amber-500",
       change: {
         value: 12,
         trend: "up"
@@ -341,7 +341,7 @@ export default function HomePage() {
       title: "Delivered Today",
       value: stats.delivered,
       icon: FiCheckCircle,
-      iconClassName: "bg-green-100 text-green-600",
+      iconClassName: "bg-cyan-500/10 text-cyan-500",
       change: {
         value: 8,
         trend: "up"
@@ -395,7 +395,7 @@ export default function HomePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Delivery Agent Section */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <div className="bg-card text-card-foreground rounded-lg shadow-sm border border-border p-6 mb-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                 <div>
                   <h2 className="text-lg font-semibold flex items-center">
@@ -430,7 +430,7 @@ export default function HomePage() {
 
           {/* Map Section */}
           <div>
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <div className="bg-card text-card-foreground rounded-lg shadow-sm border border-border p-6 mb-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold flex items-center">
                   <FiMap className="mr-2 h-5 w-5 text-green-600" />
@@ -480,7 +480,7 @@ export default function HomePage() {
         </div>
 
         {/* Orders Section */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-card text-card-foreground rounded-lg shadow-sm border border-border p-6">
           <div className="flex justify-between items-center mb-6">
             <div>
               <h2 className="text-lg font-semibold flex items-center">
@@ -543,7 +543,7 @@ export default function HomePage() {
         </div>
         
         {/* Unregistered Customers Section */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-card text-card-foreground rounded-lg shadow-sm border border-border p-6">
           <div className="flex justify-between items-center mb-6">
             <div>
               <h2 className="text-lg font-semibold flex items-center">
@@ -560,10 +560,10 @@ export default function HomePage() {
             </Button>
           </div>
 
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 flex items-center justify-between">
             <div className="flex items-center">
-              <div className="bg-orange-100 p-3 rounded-full mr-4">
-                <FiUsers className="h-6 w-6 text-orange-600" />
+              <div className="bg-orange-500/20 p-3 rounded-full mr-4">
+                <FiUsers className="h-6 w-6 text-orange-500" />
               </div>
               <div>
                 <h3 className="font-medium text-lg">العملاء غير المسجلين</h3>

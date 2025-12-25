@@ -50,15 +50,15 @@ export function AgentGridView({ agents, className, onAgentClick }: AgentGridView
             onClick={() => onAgentClick?.(agent)}
           >
             <div className="relative">
-              <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center border-2 border-white shadow-md">
-                <span className="text-xl font-semibold text-gray-700">{agentIdentifiers[agent.id] || `A${agent.id.toString().slice(0, 1)}`}</span>
+              <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center border-2 border-background shadow-sm">
+                <span className="text-xl font-semibold text-foreground">{agentIdentifiers[agent.id] || `A${agent.id.toString().slice(0, 1)}`}</span>
               </div>
               <div
-                className={`absolute bottom-1 right-1 h-3 w-3 rounded-full border-2 border-white ${getStatusColor(agent.status)}`}
+                className={`absolute bottom-1 right-1 h-3 w-3 rounded-full border-2 border-background ${getStatusColor(agent.status)}`}
               ></div>
             </div>
-            <span className="text-sm font-medium">{agent.name.split(' ')[0]}</span>
-            <span className="text-xs text-gray-500">{agent.status.charAt(0).toUpperCase() + agent.status.slice(1)}</span>
+            <span className="text-sm font-medium text-foreground">{agent.name.split(' ')[0]}</span>
+            <span className="text-xs text-muted-foreground">{agent.status.charAt(0).toUpperCase() + agent.status.slice(1)}</span>
           </div>
         ))}
       </div>

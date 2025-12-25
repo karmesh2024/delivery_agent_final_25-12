@@ -32,7 +32,7 @@ export function Header({ className, title = "لوحة التحكم", ...props }:
   return (
     <header 
       className={cn(
-        "flex h-16 items-center px-3 md:px-5 bg-white dark:bg-slate-900 transition-all duration-300 shadow-sm mt-8 mb-4 rounded-t-lg border-b-2 border-blue-500",
+        "flex h-16 items-center px-3 md:px-5 bg-card text-card-foreground transition-all duration-300 shadow-sm mt-8 mb-4 rounded-t-lg border-b border-border",
          className
       )} 
       {...props}
@@ -40,7 +40,7 @@ export function Header({ className, title = "لوحة التحكم", ...props }:
       <div className="flex flex-1 items-center justify-between gap-x-4">
         {/* عنوان الصفحة */}
         <div className="flex items-center">
-          <h1 className="text-lg font-semibold tracking-tight text-slate-800 dark:text-slate-200 rtl:ml-2">{title}</h1>
+          <h1 className="text-lg font-semibold tracking-tight text-foreground rtl:ml-2">{title}</h1>
         </div>
 
         {/* البحث والأزرار */}
@@ -64,7 +64,7 @@ export function Header({ className, title = "لوحة التحكم", ...props }:
           <Button 
             variant="ghost" 
             size="icon" 
-            className="md:hidden text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+            className="md:hidden text-muted-foreground hover:text-foreground hover:bg-muted"
             onClick={() => setShowSearch(!showSearch)}
           >
             <FiSearch className="h-5 w-5" />
@@ -74,10 +74,10 @@ export function Header({ className, title = "لوحة التحكم", ...props }:
           <Button 
             variant="ghost" 
             size="icon" 
-            className="relative text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+            className="relative text-muted-foreground hover:text-foreground hover:bg-muted"
           >
             <FiBell className="h-5 w-5" />
-            <span className="absolute top-1.5 right-1.5 flex h-2 w-2 rounded-full bg-blue-500 ring-1 ring-white dark:ring-slate-900"></span>
+            <span className="absolute top-1.5 right-1.5 flex h-2 w-2 rounded-full bg-blue-500 ring-2 ring-background"></span>
           </Button>
 
           {/* زر تبديل الوضع المظلم/الفاتح */}
@@ -85,7 +85,7 @@ export function Header({ className, title = "لوحة التحكم", ...props }:
             variant="ghost"
             size="icon"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted"
           >
             {mounted && theme === "dark" ? (
               <FiSun className="h-5 w-5" />

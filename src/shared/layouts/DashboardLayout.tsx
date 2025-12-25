@@ -33,7 +33,7 @@ export function DashboardLayout({ children, title = "Dashboard" }: DashboardLayo
   
   return (
     <SidebarContext.Provider value={{ isExpanded, toggleSidebar }}>
-      <div className="flex h-screen bg-gray-50">
+      <div className="flex h-screen bg-background text-foreground">
         <ClientOnly>
           <Sidebar />
         </ClientOnly>
