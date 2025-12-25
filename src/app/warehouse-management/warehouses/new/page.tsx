@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/shared/layouts/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card';
@@ -51,7 +51,7 @@ interface WarehouseFormData {
   images?: File[];
 }
 
-export default function NewWarehousePage() {
+function NewWarehouseForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editIdParam = searchParams?.get('editId');
@@ -2113,5 +2113,13 @@ export default function NewWarehousePage() {
       </div>
       </TooltipProvider>
     </DashboardLayout>
+  );
+}
+
+export default function NewWarehousePage() {
+  return (
+    <Suspense fallback={<div>جاري التحميل...</div>}>
+      <NewWarehouseForm />
+    </Suspense>
   );
 }

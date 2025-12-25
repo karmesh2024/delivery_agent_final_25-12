@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -18,11 +18,7 @@ import {
 } from '@/shared/components/ui/card';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 
-/**
- * صفحة التسجيل
- * تسمح للمستخدمين الجدد بالتسجيل في النظام
- */
-export default function RegisterPage() {
+function RegisterForm() {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
@@ -31,31 +27,24 @@ export default function RegisterPage() {
   
   const router = useRouter();
   const searchParams = useSearchParams();
-  const invitationToken = searchParams?.get('token'); // استخراج رمز الدعوة من الرابط
+  const invitationToken = searchParams?.get('token');
   
   const dispatch = useAppDispatch();
   const { isAuthenticated, loading, error } = useAppSelector((state) => state.auth);
   
-  // إعادة التوجيه إذا كان المستخدم مصادقًا بالفعل
   useEffect(() => {
     if (isAuthenticated) {
       router.push('/dashboard');
     }
   }, [isAuthenticated, router]);
   
-  // مسح رسائل الخطأ عند التحميل
   useEffect(() => {
     dispatch(clearError());
   }, [dispatch]);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // التحقق من تطابق كلمتي المرور
-    if (password !== confirmPassword) {
-      // يمكن استخدام إشعارات أو رسائل خطأ هنا
-      return;
-    }
+    if (password !== confirmPassword) return;
     
     const result = await dispatch(register({ 
       email, 
@@ -186,5 +175,17 @@ export default function RegisterPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="container flex items-center justify-center min-h-screen">
+        جاري التحميل...
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }

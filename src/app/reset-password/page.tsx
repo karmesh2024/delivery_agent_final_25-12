@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -18,11 +18,8 @@ import {
 } from '@/shared/components/ui/card';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 
-/**
- * صفحة إعادة تعيين كلمة المرور
- * تسمح للمستخدمين بتعيين كلمة مرور جديدة بعد النقر على رابط إعادة التعيين
- */
-export default function ResetPasswordPage() {
+// ResetPasswordForm contains the logic using useSearchParams
+function ResetPasswordForm() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [success, setSuccess] = useState(false);
@@ -172,5 +169,21 @@ export default function ResetPasswordPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+/**
+ * صفحة إعادة تعيين كلمة المرور
+ * تسمح للمستخدمين بتعيين كلمة مرور جديدة بعد النقر على رابط إعادة التعيين
+ */
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="container flex items-center justify-center min-h-screen">
+        جاري التحميل...
+      </div>
+    }>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }

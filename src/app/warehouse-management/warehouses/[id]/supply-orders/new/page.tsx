@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/shared/layouts/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card';
@@ -47,7 +47,7 @@ const convertUnitCodeToMeasurementUnit = (unitCode: string | null | undefined): 
   return unitMapping[unitCodeUpper] || 'other';
 };
 
-export default function NewSupplyOrderPage() {
+function NewSupplyOrderForm() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
   const search = useSearchParams();
@@ -379,5 +379,16 @@ export default function NewSupplyOrderPage() {
   );
 }
 
-
-
+export default function NewSupplyOrderPage() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout title="جاري التحميل...">
+        <div className="flex justify-center items-center min-h-[400px]">
+          جاري التحميل...
+        </div>
+      </DashboardLayout>
+    }>
+      <NewSupplyOrderForm />
+    </Suspense>
+  );
+}

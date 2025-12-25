@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { RootState } from '@/store';
 import { fetchSupplierById } from '../store/supplierSlice';
-import { fetchPriceOffers, updatePriceOffer, addPriceOffer } from '../store/priceOfferSlice';
+import { fetchPriceOffers, updatePriceOffer, createPriceOffer } from '../store/priceOfferSlice';
 import { SupplierPriceOffer } from '../types';
 import {
   Card,
@@ -123,7 +123,7 @@ const PriceOfferPage: React.FC = () => {
     };
 
     try {
-      await dispatch(addPriceOffer(newOffer)).unwrap();
+      await dispatch(createPriceOffer(newOffer)).unwrap();
       toast.success('تمت إضافة عرض السعر بنجاح.');
       setIsAddOfferDialogOpen(false);
       // Reset form fields
