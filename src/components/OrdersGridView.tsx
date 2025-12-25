@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
-import { Order, OrderStatus, Agent } from "@/types";
+import { DeliveryOrder, Order, OrderItem, OrderStatus, Agent } from '@/types';
 import { FiEye, FiMapPin, FiFilter, FiArrowUp, FiArrowDown, FiMap } from "react-icons/fi";
 
 // وظيفة مساعدة لتنسيق التاريخ
@@ -99,16 +99,16 @@ export function OrdersGridView({
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {orders.map((order) => (
-          <Card 
+            <Card 
             key={order.id} 
-            className="cursor-pointer hover:shadow-md transition-shadow"
+            className="cursor-pointer hover:shadow-md transition-shadow bg-card text-card-foreground border-border"
             onClick={() => onOrderClick(order)}
           >
             <CardContent className="p-4">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="font-semibold">#{order.id.substring(0, 8).toUpperCase()}</h3>
-                  <p className="text-sm text-gray-500">
+                  <h3 className="font-semibold text-foreground">#{order.id.substring(0, 8).toUpperCase()}</h3>
+                  <p className="text-sm text-muted-foreground">
                     {formatDate(order.created_at)}
                   </p>
                 </div>
@@ -117,30 +117,30 @@ export function OrdersGridView({
               
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs text-gray-500">العميل</p>
-                  <p className="font-medium">{order.customer_name || "غير معروف"}</p>
+                  <p className="text-xs text-muted-foreground">العميل</p>
+                  <p className="font-medium text-foreground">{order.customer_name || "غير معروف"}</p>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <p className="text-xs text-gray-500">العنوان</p>
-                    <p className="font-medium truncate">
+                    <p className="text-xs text-muted-foreground">العنوان</p>
+                    <p className="font-medium text-foreground truncate">
                       {order.customer_address || "غير محدد"}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">المبلغ</p>
-                    <p className="font-medium">${order.total_amount?.toFixed(2) || '0.00'}</p>
+                    <p className="text-xs text-muted-foreground">المبلغ</p>
+                    <p className="font-medium text-foreground">${order.total_amount?.toFixed(2) || '0.00'}</p>
                   </div>
                 </div>
                 
                 {order.agent_id && (
-                  <div className="mt-3 pt-3 border-t border-gray-100">
-                    <p className="text-xs text-gray-500 mb-1">مندوب التوصيل</p>
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <p className="text-xs text-muted-foreground mb-1">مندوب التوصيل</p>
                     <div className="flex items-center gap-2">
                       {order.agent && (
                         <>
-                          <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                             {order.agent.avatar_url ? (
                               <img 
                                 src={order.agent.avatar_url} 
@@ -148,16 +148,16 @@ export function OrdersGridView({
                                 className="h-full w-full rounded-full object-cover" 
                               />
                             ) : (
-                              <span className="text-sm font-semibold text-blue-700">
+                              <span className="text-sm font-semibold text-primary">
                                 {order.agent.name?.charAt(0) || "؟"}
                               </span>
                             )}
                           </div>
-                          <p className="font-medium">{order.agent.name}</p>
+                          <p className="font-medium text-foreground">{order.agent.name}</p>
                         </>
                       )}
                       {!order.agent && (
-                        <p className="text-gray-500">تم تعيين مندوب #{order.agent_id.substring(0, 6)}</p>
+                        <p className="text-muted-foreground">تم تعيين مندوب #{order.agent_id.substring(0, 6)}</p>
                       )}
                     </div>
                   </div>
@@ -172,32 +172,32 @@ export function OrdersGridView({
 
   // عرض الطلبات كجدول تفاعلي
   return (
-    <div className="overflow-x-auto rounded-lg bg-white">
+    <div className="overflow-x-auto rounded-lg bg-card text-card-foreground border border-border">
       <div className="min-w-full">
         <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: '0 8px' }}>
           <thead>
             <tr>
-              <th style={{ padding: '10px 20px', textAlign: 'right', fontWeight: 'bold', fontSize: '14px', color: '#4b5563' }}>
+              <th className="px-5 py-3 text-right font-bold text-sm text-muted-foreground">
                 <div className="flex items-center justify-end gap-2">
                   <span>رقم الطلب</span>
                   {enableFilters && (
                     <button 
                       onClick={() => toggleFilter('order_id')} 
-                      className={`p-1 rounded ${hasActiveFilter('order_id') ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+                      className={`p-1 rounded ${hasActiveFilter('order_id') ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       <FiFilter size={14} />
                     </button>
                   )}
                 </div>
                 {activeFilter === 'order_id' && (
-                  <div className="absolute z-10 mt-2 p-2 bg-white shadow-lg rounded-md border border-gray-200" style={{ minWidth: '200px' }}>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">رقم الطلب</label>
+                  <div className="absolute z-10 mt-2 p-2 bg-card shadow-lg rounded-md border border-border" style={{ minWidth: '200px' }}>
+                    <label className="block text-sm font-medium text-foreground mb-1">رقم الطلب</label>
                     <div className="flex flex-col gap-2">
                       <Input 
                         value={columnFilters.order_id} 
                         onChange={(e) => handleFilterChange('order_id', e.target.value)} 
                         placeholder="بحث..." 
-                        className="text-sm" 
+                        className="text-sm bg-background" 
                       />
                       <div className="flex justify-between mt-2">
                         <Button variant="outline" size="sm" onClick={() => handleFilterChange('order_id', '')}>مسح</Button>
@@ -340,64 +340,49 @@ export function OrdersGridView({
             {orders.map((order) => (
               <tr 
                 key={order.id} 
-                style={{ 
-                  backgroundColor: '#ffffff', 
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)', 
-                  borderRadius: '8px', 
-                  transition: 'all 0.2s ease', 
-                  cursor: 'pointer' 
-                }}
+                className="bg-card text-card-foreground hover:bg-muted transition-all duration-200 cursor-pointer border border-border"
                 onClick={() => onOrderClick(order)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                }}
               >
-                <td style={{ padding: '16px 20px', textAlign: 'right', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>
-                  <div className="font-medium">#{order.id.substring(0, 8).toUpperCase()}</div>
+                <td className="px-5 py-4 text-right rounded-r-lg">
+                  <div className="font-medium text-foreground">#{order.id.substring(0, 8).toUpperCase()}</div>
                 </td>
                 
-                <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                <td className="px-5 py-4 text-right">
                   <div className="flex items-center gap-2 justify-end">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
                       {(order.customer_name || 'عميل').charAt(0).toUpperCase()}
                     </div>
-                    <span>{order.customer_name || 'عميل'}</span>
+                    <span className="text-foreground">{order.customer_name || 'عميل'}</span>
                   </div>
                 </td>
                 
-                <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                <td className="px-5 py-4 text-right">
                   <div className="flex items-center justify-end gap-1">
-                    <span className="truncate max-w-[200px]">{order.customer_address || "غير محدد"}</span>
-                    <FiMapPin className="h-3 w-3 text-gray-500" />
+                    <span className="truncate max-w-[200px] text-muted-foreground">{order.customer_address || "غير محدد"}</span>
+                    <FiMapPin className="h-3 w-3 text-muted-foreground" />
                   </div>
                 </td>
                 
-                <td style={{ padding: '16px 20px', textAlign: 'right', fontSize: '14px', color: '#4b5563' }}>
+                <td className="px-5 py-4 text-right text-sm text-muted-foreground">
                   {formatDate(order.created_at)}
                 </td>
                 
-                <td style={{ padding: '16px 20px', textAlign: 'right', fontWeight: '500' }}>
+                <td className="px-5 py-4 text-right font-medium text-foreground">
                   ${(order.total_amount || 0).toFixed(2)}
                 </td>
                 
-                <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                <td className="px-5 py-4 text-right">
                   <StatusBadgeRow status={order.status} />
                 </td>
                 
-                <td style={{ padding: '16px 20px', textAlign: 'center', borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}>
+                <td className="px-5 py-4 text-center rounded-l-lg">
                   <div className="flex gap-2 justify-center">
                     <ActionButton 
                       icon={<FiEye size={16} />} 
                       color="blue" 
                       title="عرض التفاصيل"
                       onClick={(e) => {
-                        e.stopPropagation(); // منع انتشار الحدث إلى الصف
-                        console.log("Table View: Eye button clicked for order:", order.id); // <-- تتبع النقر
+                        e.stopPropagation();
                         onOrderClick(order);
                       }}
                     />

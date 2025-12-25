@@ -1,4 +1,4 @@
-import { Database } from '../lib/database.types';
+import { Database } from "../lib/database.types";
 
 // تعريف نوع GeoPoint للإحداثيات الجغرافية
 export interface GeoPoint {
@@ -117,9 +117,18 @@ export interface NewAgentPayload {
   currency?: string;
   wallet_type?: string; // لتجاوز القيمة الافتراضية إذا لزم الأمر
   // المناطق المعتمدة - New Field
-  approved_agent_zones?: { geographic_zone_id: string; zone_name: string; is_active: boolean; is_primary: boolean; }[];
+  approved_agent_zones?: {
+    geographic_zone_id: string;
+    zone_name: string;
+    is_active: boolean;
+    is_primary: boolean;
+  }[];
   // المستندات المرفوعة (ستحتوي على عناوين URL بعد الرفع)
-  agent_documents?: { document_type: string; document_url: string; verification_status: 'pending' | 'approved' | 'rejected'; }[];
+  agent_documents?: {
+    document_type: string;
+    document_url: string;
+    verification_status: "pending" | "approved" | "rejected";
+  }[];
 }
 
 // نوع جديد لتمثيل منطقة وكيل معتمدة قبل إرسالها إلى قاعدة البيانات
@@ -163,14 +172,19 @@ export interface UpdateAgentPayload {
   // Agent Documents (for new uploads or updates)
   // This will be handled carefully with file uploads in the component,
   // but here we might receive URLs for existing documents or new ones.
-  agent_documents?: { document_type: string; document_url?: string; verification_status?: 'pending' | 'approved' | 'rejected'; file?: File; }[];
+  agent_documents?: {
+    document_type: string;
+    document_url?: string;
+    verification_status?: "pending" | "approved" | "rejected";
+    file?: File;
+  }[];
 }
 
 // النماذج الأصلية
 export interface Agent {
   id: string;
   name: string;
-  status: 'online' | 'offline' | 'busy';
+  status: "online" | "offline" | "busy";
   avatar_url?: string | null;
   location?: GeoPoint;
   rating?: number | null;
@@ -188,7 +202,7 @@ export interface Agent {
   delivery_code?: string;
   delivery_code_status?: string;
   referral_code?: string;
-  preferred_vehicle?: 'tricycle' | 'pickup_truck' | 'light_truck' | undefined;
+  preferred_vehicle?: "tricycle" | "pickup_truck" | "light_truck" | undefined;
   badge_level?: number;
 }
 
@@ -202,12 +216,12 @@ export interface DeliveryBoy {
   full_name: string;
   date_of_birth?: string | null;
   national_id?: string | null;
-  preferred_vehicle?: 'tricycle' | 'pickup_truck' | 'light_truck' | null;
+  preferred_vehicle?: "tricycle" | "pickup_truck" | "light_truck" | null;
   license_number?: string | null;
   phone_verification_status?: string | null;
   delivery_code?: string | null;
   delivery_code_status?: string | null;
-  status: 'active' | 'inactive' | 'suspended' | 'off_duty';
+  status: "active" | "inactive" | "suspended" | "off_duty";
   total_deliveries: number;
   total_earnings: number;
   rating: number;
@@ -249,7 +263,7 @@ export interface DeliveryBoyDailyPerformance {
 export interface Trip {
   id: string;
   agent_id: string;
-  status: 'assigned' | 'in_progress' | 'completed' | 'canceled';
+  status: "assigned" | "in_progress" | "completed" | "canceled";
   start_location: {
     lat: number;
     lng: number;
@@ -284,7 +298,13 @@ export interface OrderDetailItem {
 
 export interface Order {
   id: string;
-  status: 'pending' | 'confirmed' | 'in_progress' | 'delivered' | 'canceled' | 'completed';
+  status:
+    | "pending"
+    | "confirmed"
+    | "in_progress"
+    | "delivered"
+    | "canceled"
+    | "completed";
   created_at: string;
   updated_at: string;
   customer_name: string;
@@ -294,10 +314,10 @@ export interface Order {
   agent_id?: string | null;
   agent?: Agent | null;
   delivery_time?: number | null;
-  delivery_location?: GeoPoint | string | { lat: number; lng: number; } | null;
+  delivery_location?: GeoPoint | string | { lat: number; lng: number } | null;
   delivery_address?: string | null;
   pickup_address?: string | null;
-  pickup_location?: GeoPoint | string | { lat: number; lng: number; } | null;
+  pickup_location?: GeoPoint | string | { lat: number; lng: number } | null;
   order_number?: string | null;
   notes?: string | null;
   order_details?: OrderDetailItem[] | null;
@@ -452,9 +472,23 @@ export interface OrderItem {
   quantity: number;
   price: number;
 }
-export type DeliveryBoyStatus = 'all' | 'active' | 'inactive' | 'suspended' | 'off_duty';
-export type WasteCollectionStatus = 'all' | 'pending' | 'in_progress' | 'completed' | 'canceled';
-export type CustomerApprovalStatus = 'all' | 'pending' | 'approved' | 'rejected';
+export type DeliveryBoyStatus =
+  | "all"
+  | "active"
+  | "inactive"
+  | "suspended"
+  | "off_duty";
+export type WasteCollectionStatus =
+  | "all"
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "canceled";
+export type CustomerApprovalStatus =
+  | "all"
+  | "pending"
+  | "approved"
+  | "rejected";
 export interface OrderStats {
   avg_delivery_time: number;
   pending: number;
@@ -465,10 +499,28 @@ export interface OrderStats {
   excellent_trips: number;
 }
 
-export type AgentStatus = 'all' | 'online' | 'offline' | 'busy';
-export type OrderStatus = 'all' | 'pending' | 'confirmed' | 'pickedUp' | 'inReceipt' | 'completed' | 'cancelled' | 'scheduled' | 'returned' | 'canceled' | 'in_progress' | 'delivered';
-export type TripStatus = 'all' | 'assigned' | 'in_progress' | 'completed' | 'canceled';
-export type TaskStatus = 'all_tasks' | 'on_going' | 'scheduled';
+export type AgentStatus = "all" | "online" | "offline" | "busy";
+export type OrderStatus =
+  | "all"
+  | "pending"
+  | "confirmed"
+  | "pickedUp"
+  | "inReceipt"
+  | "completed"
+  | "cancelled"
+  | "scheduled"
+  | "returned"
+  | "canceled"
+  | "in_progress"
+  | "delivered"
+  | "assigned";
+export type TripStatus =
+  | "all"
+  | "assigned"
+  | "in_progress"
+  | "completed"
+  | "canceled";
+export type TaskStatus = "all_tasks" | "on_going" | "scheduled";
 
 // ======= أنواع بيانات نطاق الرسائل =======
 
@@ -519,7 +571,7 @@ export interface DeliveryDocument {
   delivery_id: string;
   document_type: string;
   document_url: string;
-  verification_status: 'pending' | 'verified' | 'rejected';
+  verification_status: "pending" | "verified" | "rejected";
   uploaded_at: string;
   expiry_date?: string; // تاريخ انتهاء الصلاحية للمستند
   reviewer_id?: string; // معرف المراجع/الآدمن الذي تحقق من المستند
@@ -530,11 +582,11 @@ export interface DeliveryDocument {
 
 // حالة صلاحية المستند
 export enum DocumentStatus {
-  VALID = 'valid', // صالح
-  EXPIRING_SOON = 'expiring_soon', // على وشك الانتهاء
-  EXPIRED = 'expired', // منتهي الصلاحية
-  MISSING = 'missing', // غير موجود
-  REJECTED = 'rejected' // مرفوض
+  VALID = "valid", // صالح
+  EXPIRING_SOON = "expiring_soon", // على وشك الانتهاء
+  EXPIRED = "expired", // منتهي الصلاحية
+  MISSING = "missing", // غير موجود
+  REJECTED = "rejected", // مرفوض
 }
 
 // واجهة لنتائج استعلام SQL المسطحة في ApprovedAgentSummary
@@ -565,17 +617,18 @@ export interface AgentDocument {
   agent_id: string;
   document_type: DocumentType;
   document_url: string;
-  verification_status: 'pending' | 'approved' | 'rejected';
+  verification_status: "pending" | "approved" | "rejected";
   uploaded_at: string;
   last_updated: string;
   expiry_date?: string | null;
   reviewer_id?: string | null;
   review_notes?: string | null;
   rejection_reason?: string | null;
-  severity?: 'low' | 'medium' | 'high';
+  severity?: "low" | "medium" | "high";
 }
 
-export type ApprovedAgentZone = Database['public']['Tables']['approved_agent_zones']['Row'];
+export type ApprovedAgentZone =
+  Database["public"]["Tables"]["approved_agent_zones"]["Row"];
 
 export interface GeographicZone {
   id: string;
@@ -597,13 +650,13 @@ export interface GeoJSONPolygon {
   coordinates: number[][][];
 }
 
-export type CommissionUnit = 'percentage' | 'fixed_amount';
+export type CommissionUnit = "percentage" | "fixed_amount";
 
-export type CommissionType = 
-  'waste_purchase' | 
-  'product_sale' | 
-  'cash_withdrawal' |
-  'other'; // إضافة "أخرى" كنوع عام
+export type CommissionType =
+  | "waste_purchase"
+  | "product_sale"
+  | "cash_withdrawal"
+  | "other"; // إضافة "أخرى" كنوع عام
 
 export interface AgentCommission {
   type: CommissionType;
@@ -623,7 +676,14 @@ export interface RawAgentDetailsSupabase {
   function_specific_commissions?: AgentCommission[] | null;
 }
 
-export type DocumentType = "national_id_front" | "national_id_back" | "personal_photo" | "tax_card_front" | "tax_card_back" | "contract" | "other";
+export type DocumentType =
+  | "national_id_front"
+  | "national_id_back"
+  | "personal_photo"
+  | "tax_card_front"
+  | "tax_card_back"
+  | "contract"
+  | "other";
 
 export const documentTypeLabels: Record<DocumentType, string> = {
   national_id_front: "الهوية الوطنية (الوجه الأمامي)",
