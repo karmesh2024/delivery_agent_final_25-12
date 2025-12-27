@@ -23,6 +23,7 @@ import exchangeReducer from "@/domains/financial-management/store/exchangeSlice"
 import approvedAgentsReducer from "@/domains/approved-agents/store/approvedAgentsSlice";
 import storeOrdersReducer from "@/domains/store-orders/store/storeOrdersSlice";
 import purchasingReducer from "@/domains/purchasing/store/purchasingSlice";
+import industrialPartnersReducer from "../domains/industrial-partners/store/industrialPartnersSlice";
 
 export const store = configureStore({
   reducer: {
@@ -50,6 +51,7 @@ export const store = configureStore({
     approvedAgents: approvedAgentsReducer,
     storeOrders: storeOrdersReducer,
     purchasing: purchasingReducer,
+    industrialPartners: industrialPartnersReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

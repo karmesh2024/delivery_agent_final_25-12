@@ -1,11 +1,11 @@
 // 📋 نظام Logging مركزي آمن ومطور لمشروع بيكب
 
 export enum LogLevel {
-  DEBUG = 'debug',
-  INFO = 'info',
-  WARN = 'warn',
-  ERROR = 'error',
-  AUDIT = 'audit'
+  DEBUG = "debug",
+  INFO = "info",
+  WARN = "warn",
+  ERROR = "error",
+  AUDIT = "audit",
 }
 
 export interface LogEntry {
@@ -45,20 +45,31 @@ class SecureLogger {
 
   // 🔒 إخفاء البيانات الحساسة
   private maskSensitiveData(data: unknown): unknown {
-    if (typeof data !== 'object' || data === null) {
+    if (typeof data !== "object" || data === null) {
       return data;
     }
 
     const masked = { ...data } as Record<string, unknown>;
     const sensitiveFields = [
-      'password', 'token', 'secret', 'key', 'auth', 'credential',
-      'card', 'credit', 'ssn', 'social', 'phone', 'email', 'address'
+      "password",
+      "token",
+      "secret",
+      "key",
+      "auth",
+      "credential",
+      "card",
+      "credit",
+      "ssn",
+      "social",
+      "phone",
+      "email",
+      "address",
     ];
 
     for (const key in masked) {
-      if (sensitiveFields.some(field => key.toLowerCase().includes(field))) {
-        masked[key] = '[REDACTED]';
-      } else if (typeof masked[key] === 'object') {
+      if (sensitiveFields.some((field) => key.toLowerCase().includes(field))) {
+        masked[key] = "[REDACTED]";
+      } else if (typeof masked[key] === "object") {
         masked[key] = this.maskSensitiveData(masked[key]);
       }
     }
@@ -68,28 +79,37 @@ class SecureLogger {
 
   // 📝 إنشاء entry آمن
   private createLogEntry(
-    level: LogLevel, 
-    message: string, 
-    context?: Record<string, unknown>
+    level: LogLevel,
+    message: string,
+    context?: Record<string, unknown>,
   ): LogEntry {
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level,
       message,
       sessionId: this.sessionId,
-      userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'server',
+      userAgent: typeof window !== "undefined"
+        ? window.navigator.userAgent
+        : "server",
     };
 
     // إضافة معلومات السياق مع إخفاء البيانات الحساسة
     if (context) {
-      entry.context = this.maskSensitiveData(context) as Record<string, unknown>;
+      entry.context = this.maskSensitiveData(context) as Record<
+        string,
+        unknown
+      >;
     }
 
     return entry;
   }
 
   // 🚀 تسجيل رسالة
-  private log(level: LogLevel, message: string, context?: Record<string, unknown>): void {
+  private log(
+    level: LogLevel,
+    message: string,
+    context?: Record<string, unknown>,
+  ): void {
     const entry = this.createLogEntry(level, message, context);
 
     // التحقق من مستوى التسجيل المطلوب
@@ -123,8 +143,9 @@ class SecureLogger {
 
   // 📋 تسجيل في وحدة التحكم
   private consoleLog(entry: LogEntry): void {
-    const logMessage = `[${entry.timestamp}] [${entry.level.toUpperCase()}] ${entry.message}`;
-    
+    const logMessage =
+      `[${entry.timestamp}] [${entry.level.toUpperCase()}] ${entry.message}`;
+
     switch (entry.level) {
       case LogLevel.DEBUG:
         console.debug(logMessage, entry.context || {});
@@ -147,16 +168,16 @@ class SecureLogger {
   // 💾 حفظ في التخزين المحلي
   private saveToStorage(entry: LogEntry): void {
     try {
-      const key = 'secure_logs';
+      const key = "secure_logs";
       const existing = localStorage.getItem(key);
       const logs = existing ? JSON.parse(existing) as LogEntry[] : [];
-      
+
       // الاحتفاظ بآخر 1000 سجل فقط
       logs.push(entry);
       if (logs.length > 1000) {
         logs.splice(0, logs.length - 1000);
       }
-      
+
       localStorage.setItem(key, JSON.stringify(logs));
     } catch {
       // تجاهل أخطاء التخزين
@@ -167,10 +188,10 @@ class SecureLogger {
   private async sendToRemote(entry: LogEntry): Promise<void> {
     try {
       const response = await fetch(this.config.remoteEndpoint!, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.config.apiKey}`,
         },
         body: JSON.stringify(entry),
       });
@@ -207,7 +228,7 @@ class SecureLogger {
   // 🔍 الحصول على السجلات المحلية
   getStoredLogs(): LogEntry[] {
     try {
-      const stored = localStorage.getItem('secure_logs');
+      const stored = localStorage.getItem("secure_logs");
       return stored ? JSON.parse(stored) as LogEntry[] : [];
     } catch {
       return [];
@@ -216,16 +237,18 @@ class SecureLogger {
 
   // 🗑️ مسح السجلات
   clearLogs(): void {
-    localStorage.removeItem('secure_logs');
+    localStorage.removeItem("secure_logs");
   }
 }
 
 // 🎛️ إعدادات افتراضية
 const defaultConfig: LoggerConfig = {
-  enableConsole: process.env.NODE_ENV === 'development',
-  enableRemote: process.env.NODE_ENV === 'production',
+  enableConsole: process.env.NODE_ENV === "development",
+  enableRemote: process.env.NODE_ENV === "production",
   enableStorage: true,
-  minLevel: process.env.NODE_ENV === 'development' ? LogLevel.DEBUG : LogLevel.INFO,
+  minLevel: process.env.NODE_ENV === "development"
+    ? LogLevel.DEBUG
+    : LogLevel.INFO,
   remoteEndpoint: process.env.NEXT_PUBLIC_LOG_ENDPOINT,
   apiKey: process.env.LOG_API_KEY,
 };
@@ -236,34 +259,41 @@ export const logger = new SecureLogger(defaultConfig);
 // 🎯 دوال مساعدة
 export const createLogger = (context: Record<string, unknown>) => {
   return {
-    debug: (message: string, extraContext?: Record<string, unknown>) => 
+    debug: (message: string, extraContext?: Record<string, unknown>) =>
       logger.debug(message, { ...context, ...extraContext }),
-    info: (message: string, extraContext?: Record<string, unknown>) => 
+    info: (message: string, extraContext?: Record<string, unknown>) =>
       logger.info(message, { ...context, ...extraContext }),
-    warn: (message: string, extraContext?: Record<string, unknown>) => 
+    warn: (message: string, extraContext?: Record<string, unknown>) =>
       logger.warn(message, { ...context, ...extraContext }),
-    error: (message: string, extraContext?: Record<string, unknown>) => 
+    error: (message: string, extraContext?: Record<string, unknown>) =>
       logger.error(message, { ...context, ...extraContext }),
-    audit: (message: string, extraContext?: Record<string, unknown>) => 
+    audit: (message: string, extraContext?: Record<string, unknown>) =>
       logger.audit(message, { ...context, ...extraContext }),
   };
 };
 
 // 🔐 دوال أمان
-export const logSecurityEvent = (event: string, details?: Record<string, unknown>) => {
-  logger.audit(`Security Event: ${event}`, { 
-    event, 
+export const logSecurityEvent = (
+  event: string,
+  details?: Record<string, unknown>,
+) => {
+  logger.audit(`Security Event: ${event}`, {
+    event,
     timestamp: new Date().toISOString(),
-    ...details 
+    ...details,
   });
 };
 
-export const logUserAction = (action: string, userId: string, details?: Record<string, unknown>) => {
-  logger.audit(`User Action: ${action}`, { 
-    action, 
-    userId, 
+export const logUserAction = (
+  action: string,
+  userId: string,
+  details?: Record<string, unknown>,
+) => {
+  logger.audit(`User Action: ${action}`, {
+    action,
+    userId,
     timestamp: new Date().toISOString(),
-    ...details 
+    ...details,
   });
 };
 
@@ -271,88 +301,117 @@ export const logUserAction = (action: string, userId: string, details?: Record<s
 
 // API Logger - للمهام المتعلقة بالـ API
 export const apiLogger = {
-  info: (message: string, context?: Record<string, unknown>) => 
+  info: (message: string, context?: Record<string, unknown>) =>
     logger.info(`[API] ${message}`, context),
-  error: (message: string, context?: Record<string, unknown>) => 
+  error: (message: string, context?: Record<string, unknown>) =>
     logger.error(`[API] ${message}`, context),
-  warn: (message: string, context?: Record<string, unknown>) => 
+  warn: (message: string, context?: Record<string, unknown>) =>
     logger.warn(`[API] ${message}`, context),
-  debug: (message: string, context?: Record<string, unknown>) => 
+  debug: (message: string, context?: Record<string, unknown>) =>
     logger.debug(`[API] ${message}`, context),
 };
 
 // Auth Logger - للمهام المتعلقة بالمصادقة
 export const authLogger = {
-  info: (message: string, context?: Record<string, unknown>) => 
+  info: (message: string, context?: Record<string, unknown>) =>
     logger.info(`[AUTH] ${message}`, context),
-  error: (message: string, context?: Record<string, unknown>) => 
+  error: (message: string, context?: Record<string, unknown>) =>
     logger.error(`[AUTH] ${message}`, context),
-  warn: (message: string, context?: Record<string, unknown>) => 
+  warn: (message: string, context?: Record<string, unknown>) =>
     logger.warn(`[AUTH] ${message}`, context),
-  audit: (message: string, context?: Record<string, unknown>) => 
+  audit: (message: string, context?: Record<string, unknown>) =>
     logger.audit(`[AUTH] ${message}`, context),
 };
 
 // Validation Logger - للمهام المتعلقة بالتحقق
 export const validationLogger = {
-  info: (message: string, context?: Record<string, unknown>) => 
+  info: (message: string, context?: Record<string, unknown>) =>
     logger.info(`[VALIDATION] ${message}`, context),
-  error: (message: string, context?: Record<string, unknown>) => 
+  error: (message: string, context?: Record<string, unknown>) =>
     logger.error(`[VALIDATION] ${message}`, context),
-  warn: (message: string, context?: Record<string, unknown>) => 
+  warn: (message: string, context?: Record<string, unknown>) =>
     logger.warn(`[VALIDATION] ${message}`, context),
-  debug: (message: string, context?: Record<string, unknown>) => 
+  debug: (message: string, context?: Record<string, unknown>) =>
     logger.debug(`[VALIDATION] ${message}`, context),
+};
+
+// DB Logger - للمهام المتعلقة بقاعدة البيانات
+export const dbLogger = {
+  info: (message: string, context?: Record<string, unknown>) =>
+    logger.info(`[DB] ${message}`, context),
+  error: (message: string, context?: Record<string, unknown>) =>
+    logger.error(`[DB] ${message}`, context),
+  warn: (message: string, context?: Record<string, unknown>) =>
+    logger.warn(`[DB] ${message}`, context),
+  debug: (message: string, context?: Record<string, unknown>) =>
+    logger.debug(`[DB] ${message}`, context),
 };
 
 // 🔒 دالة تنظيف البيانات قبل التسجيل
 export const cleanForLog = (data: unknown): unknown => {
-  if (typeof data === 'string') {
+  if (typeof data === "string") {
     // تنظيف النصوص من المعلومات الحساسة
     return data
-      .replace(/password/gi, '[PASSWORD]')
-      .replace(/token/gi, '[TOKEN]')
-      .replace(/secret/gi, '[SECRET]')
-      .replace(/key/gi, '[KEY]')
-      .replace(/auth/gi, '[AUTH]')
-      .replace(/credential/gi, '[CREDENTIAL]');
+      .replace(/password/gi, "[PASSWORD]")
+      .replace(/token/gi, "[TOKEN]")
+      .replace(/secret/gi, "[SECRET]")
+      .replace(/key/gi, "[KEY]")
+      .replace(/auth/gi, "[AUTH]")
+      .replace(/credential/gi, "[CREDENTIAL]");
   }
-  
-  if (typeof data === 'object' && data !== null) {
+
+  if (typeof data === "object" && data !== null) {
     const cleaned = { ...data } as Record<string, unknown>;
     const sensitiveFields = [
-      'password', 'token', 'secret', 'key', 'auth', 'credential',
-      'card', 'credit', 'ssn', 'social', 'phone', 'email', 'address',
-      'user_password', 'access_token', 'refresh_token', 'api_key',
-      'private_key', 'public_key', 'hash', 'salt'
+      "password",
+      "token",
+      "secret",
+      "key",
+      "auth",
+      "credential",
+      "card",
+      "credit",
+      "ssn",
+      "social",
+      "phone",
+      "email",
+      "address",
+      "user_password",
+      "access_token",
+      "refresh_token",
+      "api_key",
+      "private_key",
+      "public_key",
+      "hash",
+      "salt",
     ];
 
     for (const key in cleaned) {
-      if (sensitiveFields.some(field => key.toLowerCase().includes(field))) {
-        cleaned[key] = '[REDACTED]';
-      } else if (typeof cleaned[key] === 'string') {
+      if (sensitiveFields.some((field) => key.toLowerCase().includes(field))) {
+        cleaned[key] = "[REDACTED]";
+      } else if (typeof cleaned[key] === "string") {
         // تنظيف القيم النصية
         cleaned[key] = cleanForLog(cleaned[key]);
-      } else if (typeof cleaned[key] === 'object') {
+      } else if (typeof cleaned[key] === "object") {
         // تنظيف الكائنات المتداخلة
         cleaned[key] = cleanForLog(cleaned[key]);
       }
     }
-    
+
     return cleaned;
   }
-  
+
   return data;
 };
 
 // 🎛️ دوال مساعدة للتكامل مع Redux
 export const getCurrentUserId = (): string | null => {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     try {
-      const state = localStorage.getItem('persist:app');
+      const state = localStorage.getItem("persist:app");
       if (state) {
         const parsed = JSON.parse(state);
-        const auth = JSON.parse(parsed.auth || '{}');
+        const auth = JSON.parse(parsed.auth || "{}");
         return auth.user?.id || auth.userId || null;
       }
     } catch {
@@ -363,9 +422,9 @@ export const getCurrentUserId = (): string | null => {
 };
 
 export const getCurrentSession = (): string | null => {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     try {
-      const session = localStorage.getItem('auth_session');
+      const session = localStorage.getItem("auth_session");
       return session ? JSON.parse(session).id : null;
     } catch {
       return null;
@@ -378,7 +437,7 @@ export const getCurrentSession = (): string | null => {
 export const envLogger = {
   check: (key: string, value: string): boolean => {
     // فحص أساسي لقيم متغيرات البيئة
-    if (!value || typeof value !== 'string') {
+    if (!value || typeof value !== "string") {
       return false;
     }
 
@@ -393,26 +452,35 @@ export const envLogger = {
     }
 
     // فحص قيم محددة حسب نوع المتغير
-    if (key.includes('URL') || key.includes('ENDPOINT')) {
+    if (key.includes("URL") || key.includes("ENDPOINT")) {
       return /^https?:\/\/.+/.test(value);
     }
 
-    if (key.includes('KEY') || key.includes('SECRET') || key.includes('TOKEN')) {
+    if (
+      key.includes("KEY") || key.includes("SECRET") || key.includes("TOKEN")
+    ) {
       // فحص طول المفاتيح (على الأقل 20 حرف للـ API keys)
       return value.length >= 20;
     }
 
-    if (key.includes('EMAIL')) {
+    if (key.includes("EMAIL")) {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
     }
 
-    if (key.includes('PASSWORD')) {
+    if (key.includes("PASSWORD")) {
       // فحص قوة كلمة المرور (على الأقل 8 أحرف وتحتوي على حروف وأرقام)
       return /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*#?&]{8,}$/.test(value);
     }
 
     // التحقق من القيم المحظورة
-    const forbiddenValues = ['null', 'undefined', 'none', 'test', 'example', 'placeholder'];
+    const forbiddenValues = [
+      "null",
+      "undefined",
+      "none",
+      "test",
+      "example",
+      "placeholder",
+    ];
     if (forbiddenValues.includes(value.toLowerCase())) {
       return false;
     }
@@ -422,28 +490,30 @@ export const envLogger = {
       /password\s*=\s*['\"]?123/i,
       /secret\s*=\s*['\"]?secret/i,
       /key\s*=\s*['\"]?key/i,
-      /token\s*=\s*['\"]?token/i
+      /token\s*=\s*['\"]?token/i,
     ];
-    
-    if (sensitivePatterns.some(pattern => pattern.test(value))) {
+
+    if (sensitivePatterns.some((pattern) => pattern.test(value))) {
       return false;
     }
 
     return true;
   },
 
-  validate: (config: Record<string, string>): { isValid: boolean; issues: string[] } => {
+  validate: (
+    config: Record<string, string>,
+  ): { isValid: boolean; issues: string[] } => {
     const issues: string[] = [];
-    
+
     for (const [key, value] of Object.entries(config)) {
       if (!envLogger.check(key, value)) {
         issues.push(`Invalid environment variable: ${key}`);
       }
     }
-    
+
     return {
       isValid: issues.length === 0,
-      issues
+      issues,
     };
-  }
+  },
 };

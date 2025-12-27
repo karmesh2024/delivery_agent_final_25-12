@@ -20,34 +20,34 @@ const DUMMY_DATA = [
     id: 1, 
     product: { name: 'الألومنيوم' }, 
     category: { name: 'معادن' },
-    current_price: 1250.50, 
+    buy_price: 1250.50, 
     base_price: 1200.00, 
     price_change_percentage: 4.2, 
     total_available_stock: 5000,
     demand_level: 'high',
-    last_price_update: '2023-11-20T10:30:00'
+    last_update: '2023-11-20T10:30:00'
   },
   { 
     id: 2, 
     product: { name: 'النحاس' }, 
     category: { name: 'معادن' },
-    current_price: 2300.75, 
+    buy_price: 2300.75, 
     base_price: 2500.00, 
     price_change_percentage: -8.0, 
     total_available_stock: 3200,
     demand_level: 'normal',
-    last_price_update: '2023-11-20T11:15:00'
+    last_update: '2023-11-20T11:15:00'
   },
   { 
     id: 3, 
     product: { name: 'الورق المقوى' }, 
     category: { name: 'ورق' },
-    current_price: 320.25, 
+    buy_price: 320.25, 
     base_price: 300.00, 
     price_change_percentage: 6.75, 
     total_available_stock: 12000,
     demand_level: 'high',
-    last_price_update: '2023-11-20T09:45:00'
+    last_update: '2023-11-20T09:45:00'
   }
 ];
 
@@ -143,7 +143,7 @@ const FallbackExchange: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {loading ? '...' : Math.max(...prices.map(p => p.current_price)).toFixed(2)} ريال
+              {loading ? '...' : Math.max(...prices.map(p => p.buy_price)).toFixed(2)} جنيه
             </div>
           </CardContent>
         </Card>
@@ -153,7 +153,7 @@ const FallbackExchange: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {loading ? '...' : Math.min(...prices.map(p => p.current_price)).toFixed(2)} ريال
+              {loading ? '...' : Math.min(...prices.map(p => p.buy_price)).toFixed(2)} جنيه
             </div>
           </CardContent>
         </Card>
@@ -178,7 +178,7 @@ const FallbackExchange: React.FC = () => {
                 <TableHead className="w-[100px]">المادة</TableHead>
                 <TableHead>الفئة</TableHead>
                 <TableHead className="text-center">المخزون المتاح</TableHead>
-                <TableHead className="text-center">السعر الحالي</TableHead>
+                <TableHead className="text-center">سعر الشراء</TableHead>
                 <TableHead className="text-center">التغير</TableHead>
                 <TableHead className="text-center">آخر تحديث</TableHead>
               </TableRow>
@@ -194,7 +194,7 @@ const FallbackExchange: React.FC = () => {
                     <TableCell className="font-medium">{item.product.name}</TableCell>
                     <TableCell>{item.category.name}</TableCell>
                     <TableCell className="text-center">{item.total_available_stock.toLocaleString()}</TableCell>
-                    <TableCell className="font-bold text-center">{item.current_price.toFixed(2)}</TableCell>
+                    <TableCell className="font-bold text-center">{item.buy_price.toFixed(2)}</TableCell>
                     <TableCell className="text-center">
                       <div className={`flex items-center justify-center ${item.price_change_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {item.price_change_percentage >= 0 ? (
@@ -206,7 +206,7 @@ const FallbackExchange: React.FC = () => {
                       </div>
                     </TableCell>
                     <TableCell className="text-center text-sm text-gray-500">
-                      {formatDate(item.last_price_update)}
+                      {formatDate(item.last_update)}
                     </TableCell>
                   </TableRow>
                 ))
@@ -225,4 +225,4 @@ const FallbackExchange: React.FC = () => {
   );
 };
 
-export default FallbackExchange; 
+export default FallbackExchange;

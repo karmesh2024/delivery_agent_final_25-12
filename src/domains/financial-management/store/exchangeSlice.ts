@@ -1,5 +1,5 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { StockExchange, exchangeService } from '../services/exchangeService';
+import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { exchangeService, StockExchange } from "../services/exchangeService";
 
 // تعريف حالة البورصة
 interface ExchangeState {
@@ -23,7 +23,7 @@ const initialState: ExchangeState = {
 
 // جلب جميع أسعار البورصة
 export const fetchPrices = createAsyncThunk(
-  'exchange/fetchAll',
+  "exchange/fetchAll",
   async (_, { rejectWithValue }) => {
     try {
       const prices = await exchangeService.getAllPrices();
@@ -31,108 +31,82 @@ export const fetchPrices = createAsyncThunk(
     } catch (error) {
       return rejectWithValue((error as Error).message);
     }
-  }
+  },
 );
 
 // جلب سعر منتج محدد في البورصة
 export const fetchPriceByProductId = createAsyncThunk(
-  'exchange/fetchByProductId',
+  "exchange/fetchByProductId",
   async (productId: string, { rejectWithValue }) => {
     try {
       const price = await exchangeService.getPriceByProductId(productId);
       if (!price) {
-        return rejectWithValue('المنتج غير موجود في البورصة');
+        return rejectWithValue("المنتج غير موجود في البورصة");
       }
       return price;
     } catch (error) {
       return rejectWithValue((error as Error).message);
     }
-  }
+  },
 );
 
 // إضافة منتج جديد للبورصة
 export const addProductToExchange = createAsyncThunk(
-  'exchange/addProduct',
-  async (product: Omit<StockExchange, 'id'>, { rejectWithValue }) => {
+  "exchange/addProduct",
+  async (product: Omit<StockExchange, "id">, { rejectWithValue }) => {
     try {
       const newProduct = await exchangeService.addProductToExchange(product);
       if (!newProduct) {
-        return rejectWithValue('فشل في إضافة المنتج للبورصة');
+        return rejectWithValue("فشل في إضافة المنتج للبورصة");
       }
       return newProduct;
     } catch (error) {
       return rejectWithValue((error as Error).message);
     }
-  }
+  },
 );
 
 // تحديث منتج موجود في البورصة
 export const updateExchangeProduct = createAsyncThunk(
-  'exchange/updateProduct',
-  async ({ id, product }: { id: number; product: Partial<StockExchange> }, { rejectWithValue }) => {
+  "exchange/updateProduct",
+  async (
+    { id, product }: { id: number; product: Partial<StockExchange> },
+    { rejectWithValue },
+  ) => {
     try {
-      const updatedProduct = await exchangeService.updateExchangeProduct(id, product);
+      const updatedProduct = await exchangeService.updateExchangeProduct(
+        id,
+        product,
+      );
       if (!updatedProduct) {
-        return rejectWithValue('فشل في تحديث المنتج في البورصة');
+        return rejectWithValue("فشل في تحديث المنتج في البورصة");
       }
       return updatedProduct;
     } catch (error) {
       return rejectWithValue((error as Error).message);
     }
-  }
+  },
 );
 
 // حذف منتج من البورصة
 export const deleteExchangeProduct = createAsyncThunk(
-  'exchange/deleteProduct',
+  "exchange/deleteProduct",
   async (id: number, { rejectWithValue }) => {
     try {
       const success = await exchangeService.deleteExchangeProduct(id);
       if (!success) {
-        return rejectWithValue('فشل في حذف المنتج من البورصة');
+        return rejectWithValue("فشل في حذف المنتج من البورصة");
       }
       return id;
     } catch (error) {
       return rejectWithValue((error as Error).message);
     }
-  }
-);
-
-// تحديث السعر الديناميكي للمنتج
-export const calculateAndUpdatePrice = createAsyncThunk(
-  'exchange/calculatePrice',
-  async (productId: string, { rejectWithValue }) => {
-    try {
-      const updatedProduct = await exchangeService.calculateAndUpdatePrice(productId);
-      if (!updatedProduct) {
-        return rejectWithValue('فشل في حساب وتحديث سعر المنتج');
-      }
-      return updatedProduct;
-    } catch (error) {
-      return rejectWithValue((error as Error).message);
-    }
-  }
-);
-
-// تحديث أسعار جميع المنتجات في البورصة
-export const updateAllPrices = createAsyncThunk(
-  'exchange/updateAllPrices',
-  async (_, { rejectWithValue }) => {
-    try {
-      const success = await exchangeService.updateAllPrices();
-      if (!success) {
-        return rejectWithValue('فشل في تحديث أسعار البورصة');
-      }
-      return { timestamp: new Date().toISOString() };
-    } catch (error) {
-      return rejectWithValue((error as Error).message);
-    }
-  }
+  },
 );
 
 // شريحة Redux للبورصة
 const exchangeSlice = createSlice({
-  name: 'exchange',
+  name: "exchange",
   initialState,
   reducers: {
     clearCurrentProduct: (state) => {
@@ -157,7 +131,6 @@ const exchangeSlice = createSlice({
         state.loading = false;
         state.error = action.payload as string;
       })
-      
       // جلب سعر منتج محدد
       .addCase(fetchPriceByProductId.pending, (state) => {
         state.loading = true;
@@ -171,94 +144,70 @@ const exchangeSlice = createSlice({
         state.loading = false;
         state.error = action.payload as string;
       })
-      
       // إضافة منتج للبورصة
       .addCase(addProductToExchange.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(addProductToExchange.fulfilled, (state, action: PayloadAction<StockExchange>) => {
-        state.loading = false;
-        state.prices.push(action.payload);
-        state.currentProduct = action.payload;
-      })
+      .addCase(
+        addProductToExchange.fulfilled,
+        (state, action: PayloadAction<StockExchange>) => {
+          state.loading = false;
+          state.prices.push(action.payload);
+          state.currentProduct = action.payload;
+        },
+      )
       .addCase(addProductToExchange.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       })
-      
       // تحديث منتج في البورصة
       .addCase(updateExchangeProduct.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(updateExchangeProduct.fulfilled, (state, action: PayloadAction<StockExchange>) => {
-        state.loading = false;
-        const index = state.prices.findIndex(p => p.id === action.payload.id);
-        if (index !== -1) {
-          state.prices[index] = action.payload;
-        }
-        state.currentProduct = action.payload;
-      })
+      .addCase(
+        updateExchangeProduct.fulfilled,
+        (state, action: PayloadAction<StockExchange>) => {
+          state.loading = false;
+          const index = state.prices.findIndex((p) =>
+            p.id === action.payload.id
+          );
+          if (index !== -1) {
+            state.prices[index] = action.payload;
+          }
+          state.currentProduct = action.payload;
+        },
+      )
       .addCase(updateExchangeProduct.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       })
-      
       // حذف منتج من البورصة
       .addCase(deleteExchangeProduct.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(deleteExchangeProduct.fulfilled, (state, action: PayloadAction<number>) => {
-        state.loading = false;
-        state.prices = state.prices.filter(p => p.id !== action.payload);
-        if (state.currentProduct && state.currentProduct.id === action.payload) {
-          state.currentProduct = null;
-        }
-      })
+      .addCase(
+        deleteExchangeProduct.fulfilled,
+        (state, action: PayloadAction<number>) => {
+          state.loading = false;
+          state.prices = state.prices.filter((p) => p.id !== action.payload);
+          if (
+            state.currentProduct && state.currentProduct.id === action.payload
+          ) {
+            state.currentProduct = null;
+          }
+        },
+      )
       .addCase(deleteExchangeProduct.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-      })
-      
-      // تحديث سعر منتج واحد
-      .addCase(calculateAndUpdatePrice.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(calculateAndUpdatePrice.fulfilled, (state, action: PayloadAction<StockExchange>) => {
-        state.loading = false;
-        const index = state.prices.findIndex(p => p.id === action.payload.id);
-        if (index !== -1) {
-          state.prices[index] = action.payload;
-        }
-        if (state.currentProduct && state.currentProduct.id === action.payload.id) {
-          state.currentProduct = action.payload;
-        }
-      })
-      .addCase(calculateAndUpdatePrice.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-      })
-      
-      // تحديث جميع الأسعار
-      .addCase(updateAllPrices.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(updateAllPrices.fulfilled, (state, action: PayloadAction<{ timestamp: string }>) => {
-        state.loading = false;
-        state.lastUpdateTime = action.payload.timestamp;
-        // بعد تحديث جميع الأسعار، يجب استدعاء fetchPrices للحصول على الأسعار المحدثة
-      })
-      .addCase(updateAllPrices.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });
   },
 });
 
-export const { clearCurrentProduct, clearExchangeError } = exchangeSlice.actions;
+export const { clearCurrentProduct, clearExchangeError } =
+  exchangeSlice.actions;
 
-export default exchangeSlice.reducer; 
+export default exchangeSlice.reducer;
