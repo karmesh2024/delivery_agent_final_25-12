@@ -13,7 +13,17 @@ import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { qrCodeService } from '@/services/qrCodeService';
-import { wasteCatalogService } from '@/services/wasteCatalogService';
+import { 
+  wasteCatalogService, 
+  WasteCatalogItem, 
+  WasteSector, 
+  ClientType, 
+  SourceReason, 
+  WasteMainCategory, 
+  WasteSubCategory, 
+  PlasticType, 
+  MetalType 
+} from '@/services/wasteCatalogService';
 import { Wizard } from '@/shared/components/Wizard';
 
 // سيتم تحميل البيانات من قاعدة البيانات
@@ -91,6 +101,7 @@ interface WasteFormData {
   fabric_condition: string;
   fabric_cut_type: string;
   unit_mode: 'weight' | 'volume' | 'count' | 'dimension';
+  unit_id?: number; // الحقل المضاف
   weight: number | null;
   volume: number | null;
   count: number | null;
@@ -131,8 +142,15 @@ interface WasteFormData {
   pollution_percentage: number; // نسبة مستوى التلوث
 }
 
-export default function WasteCatalogFormWizard() {
+interface WasteCatalogFormWizardProps {
+  wasteId?: number;
+  initialData?: WasteCatalogItem;
+}
+
+export default function WasteCatalogFormWizard({ wasteId, initialData }: WasteCatalogFormWizardProps = {}) {
+  const [isEditing, setIsEditing] = useState(!!wasteId);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
   
   const [formData, setFormData] = useState<WasteFormData>({
     waste_no: '',
@@ -188,7 +206,7 @@ export default function WasteCatalogFormWizard() {
     max_storage_days: null,
     alert_on_exceed: false,
     status: 'waiting',
-    images: [],
+    images: [], // سيتم التعامل مع الصور كـ File[] لاحقاً أو string[]
     documents: [],
     notes: '',
     qr_code: '',
@@ -202,7 +220,8 @@ export default function WasteCatalogFormWizard() {
     is_returnable_after_sorting: false,
     initial_sorting_from_supplier: '',
     initial_sorting_percentage: 0,
-    pollution_percentage: 0
+    pollution_percentage: 0,
+    unit_id: undefined
   });
 
   const [showPlasticDialog, setShowPlasticDialog] = useState(false);
@@ -227,16 +246,121 @@ export default function WasteCatalogFormWizard() {
 
   // البيانات المحملة من قاعدة البيانات
   const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([]);
-  const [wasteMainCategories, setWasteMainCategories] = useState<{ id: number; code: string; name: string }[]>([]);
-  const [wasteSubCategories, setWasteSubCategories] = useState<{ id: number; code: string; name: string; main_id: number }[]>([]);
+  const [wasteMainCategories, setWasteMainCategories] = useState<WasteMainCategory[]>([]);
+  const [wasteSubCategories, setWasteSubCategories] = useState<WasteSubCategory[]>([]);
   const [units, setUnits] = useState<{ id: number; name: string; symbol: string }[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
 
+  // تحميل البيانات الأولية عند التعديل
+  useEffect(() => {
+    if (initialData && isEditing) {
+      setFormData({
+        waste_no: initialData.waste_no || '',
+        warehouse_id: initialData.warehouse_id || null,
+        registration_date: initialData.registration_date || new Date().toISOString().split('T')[0],
+        source: initialData.source || '',
+        sector_id: initialData.sector_id || null,
+        client_type_id: initialData.client_type_id || null,
+        source_code: initialData.source_code || '',
+        reason_id: initialData.reason_id || null,
+        related_product_id: initialData.related_product_id || null,
+        main_category_id: initialData.main_category_id || null,
+        sub_category_id: initialData.sub_category_id || null,
+        plastic_type_id: initialData.plastic_type_id || null,
+        metal_type_id: initialData.metal_type_id || null,
+        plastic_code: initialData.plastic_code || '',
+        plastic_shape: initialData.plastic_shape || '',
+        plastic_color: initialData.plastic_color || '',
+        plastic_cleanliness: initialData.plastic_cleanliness || '',
+        plastic_hardness: initialData.plastic_hardness || '',
+        metal_shape: initialData.metal_shape || '',
+        metal_condition: initialData.metal_condition || '',
+        paper_type: initialData.paper_type || '',
+        paper_condition: initialData.paper_condition || '',
+        paper_print_type: initialData.paper_print_type || '',
+        glass_type: initialData.glass_type || '',
+        glass_shape: initialData.glass_shape || '',
+        fabric_type: initialData.fabric_type || '',
+        fabric_condition: initialData.fabric_condition || '',
+        fabric_cut_type: initialData.fabric_cut_type || '',
+        unit_mode: initialData.unit_mode || 'weight',
+        weight: initialData.weight || null,
+        volume: initialData.volume || null,
+        count: initialData.count || null,
+        length: initialData.length || null,
+        width: initialData.width || null,
+        height: initialData.height || null,
+        recyclable: initialData.recyclable || false,
+        quality_grade: initialData.quality_grade || '',
+        impurities_percent: initialData.impurities_percent || 0,
+        sorting_status: initialData.sorting_status || '',
+        contamination_level: initialData.contamination_level || '',
+        disposal_reason: initialData.disposal_reason || '',
+        disposal_method: initialData.disposal_method || '',
+        expected_price: initialData.expected_price || null,
+        expected_total: initialData.expected_total || null,
+        temp_location: initialData.temp_location || '',
+        rack_row_col: initialData.rack_row_col || '',
+        storage_conditions: initialData.storage_conditions || '',
+        stackable: initialData.stackable || false,
+        max_stack_height: initialData.max_stack_height || null,
+        max_storage_days: initialData.max_storage_days || null,
+        alert_on_exceed: initialData.alert_on_exceed || false,
+        status: initialData.status || 'waiting',
+        images: [],
+        documents: [],
+        notes: initialData.notes || '',
+        qr_code: initialData.qr_code || '',
+        emergency_flags: initialData.emergency_flags ? 
+          (typeof initialData.emergency_flags === 'string' ? JSON.parse(initialData.emergency_flags) : initialData.emergency_flags) 
+          : {
+          urgent_processing: false,
+          special_approvals: false,
+          health_hazard: false,
+          environmental_hazard: false
+        },
+        is_returnable_after_sorting: initialData.is_returnable_after_sorting || false,
+        initial_sorting_from_supplier: initialData.initial_sorting_from_supplier || '',
+        initial_sorting_percentage: initialData.initial_sorting_percentage || 0,
+        pollution_percentage: initialData.pollution_percentage || 0,
+        unit_id: initialData.unit_id || undefined
+      });
+
+      if (initialData.main_category_id) {
+        wasteCatalogService.getWasteSubCategories(initialData.main_category_id).then(subs => {
+          setWasteSubCategories(subs);
+        });
+      }
+    }
+  }, [initialData, isEditing]);
+  const existingImages = useMemo(() => {
+    if (!initialData?.images) return [];
+    if (Array.isArray(initialData.images)) return initialData.images;
+    try {
+      return JSON.parse(initialData.images as any);
+    } catch {
+      return [];
+    }
+  }, [initialData?.images]);
+
+  const existingDocuments = useMemo(() => {
+    if (!initialData?.documents) return [];
+    if (Array.isArray(initialData.documents)) return initialData.documents;
+    try {
+      return JSON.parse(initialData.documents as any);
+    } catch {
+      return [];
+    }
+  }, [initialData?.documents]);
+
+
   // البيانات الجديدة للنظام المحسن
-  const [sectors, setSectors] = useState<{ id: number; name: string; description?: string }[]>([]);
-  const [clientTypes, setClientTypes] = useState<{ id: number; sector_id: number; name: string; description?: string }[]>([]);
+  const [sectors, setSectors] = useState<WasteSector[]>([]);
+  const [clientTypes, setClientTypes] = useState<ClientType[]>([]);
   const [availableSources, setAvailableSources] = useState<{ id: string; name: string; description?: string }[]>([]);
-  const [availableReasons, setAvailableReasons] = useState<{ id: number; name: string; description?: string }[]>([]);
+  const [availableReasons, setAvailableReasons] = useState<SourceReason[]>([]);
+  const [plasticTypes, setPlasticTypes] = useState<PlasticType[]>([]);
+  const [metalTypes, setMetalTypes] = useState<MetalType[]>([]);
 
   const [newPlasticType, setNewPlasticType] = useState({ code: '', name: '', description: '' });
   const [newMetalType, setNewMetalType] = useState({ name: '' });
@@ -268,6 +392,14 @@ export default function WasteCatalogFormWizard() {
         // تحميل البيانات الجديدة للنظام المحسن
         const sectorsData = await wasteCatalogService.getWasteSectors();
         setSectors(sectorsData);
+
+        // تحميل أنواع البلاستيك والمعادن
+        const [plasticTypesData, metalTypesData] = await Promise.all([
+          wasteCatalogService.getPlasticTypes(),
+          wasteCatalogService.getMetalTypes()
+        ]);
+        setPlasticTypes(plasticTypesData);
+        setMetalTypes(metalTypesData);
         
       } catch (error) {
         console.error('خطأ في تحميل البيانات:', error);
@@ -298,12 +430,40 @@ export default function WasteCatalogFormWizard() {
     loadSubCategories();
   }, [formData.main_category_id]);
 
+  // تحميل أنواع البلاستيك أو المعادن أو الورق عند تغيير الفئة الفرعية
+  useEffect(() => {
+    const loadMaterialTypes = async () => {
+      if (!formData.sub_category_id) return;
+
+      try {
+        const subId = Number(formData.sub_category_id);
+        const mainId = Number(formData.main_category_id);
+
+        // إذا كانت الفئة الرئيسية بلاستيك (يمكننا التحقق بالكود أو الـ ID)
+        // لنفترض أن ID البلاستيك هو 1 أو كوده PLASTIC
+        const mainCategory = wasteMainCategories.find(c => c.id === mainId);
+        
+        if (mainCategory?.code === 'PLASTIC') {
+          const data = await wasteCatalogService.getPlasticTypes(subId);
+          setPlasticTypes(data);
+        } else if (mainCategory?.code === 'METAL') {
+          const data = await wasteCatalogService.getMetalTypes(subId);
+          setMetalTypes(data);
+        }
+      } catch (error) {
+        console.error('Error loading material types:', error);
+      }
+    };
+
+    loadMaterialTypes();
+  }, [formData.sub_category_id, formData.main_category_id, wasteMainCategories]);
+
   // تحميل أنواع العملاء عند تغيير القطاع
   useEffect(() => {
     const loadClientTypes = async () => {
       if (formData.sector_id) {
         try {
-          const clientTypesData = await wasteCatalogService.getClientTypes(formData.sector_id);
+          const clientTypesData = await wasteCatalogService.getClientTypes(Number(formData.sector_id));
           setClientTypes(clientTypesData);
           // إعادة تعيين نوع العميل عند تغيير القطاع
           handleFormChange('client_type_id', null);
@@ -324,8 +484,12 @@ export default function WasteCatalogFormWizard() {
     const loadAvailableSources = async () => {
       if (formData.sector_id && formData.client_type_id) {
         try {
-          const sourcesData = await wasteCatalogService.getAvailableSources(formData.sector_id, formData.client_type_id);
-          setAvailableSources(sourcesData);
+          const sourcesData = await wasteCatalogService.getAvailableSources(Number(formData.sector_id), Number(formData.client_type_id));
+          setAvailableSources(sourcesData.map((s: any) => ({
+            id: s.id.toString(),
+            name: s.name,
+            description: s.name
+          })));
           // إعادة تعيين المصدر عند تغيير نوع العميل
           handleFormChange('source_code', '');
         } catch (error) {
@@ -587,14 +751,14 @@ export default function WasteCatalogFormWizard() {
 
       const qrData = qrCodeService.createWasteQRData({
         id: formData.waste_no,
-        name: mockWasteMainCategories.find(c => c.id === formData.main_category_id)?.name || 'مخلفات',
+        name: wasteMainCategories.find((c: any) => c.id === formData.main_category_id)?.name || 'مخلفات',
         wasteNo: formData.waste_no,
-        warehouse: mockWarehouses.find(w => w.id === formData.warehouse_id)?.name,
-        category: mockWasteMainCategories.find(c => c.id === formData.main_category_id)?.name,
-        weight: formData.weight,
-        volume: formData.volume,
-        count: formData.count,
-        status: mockWasteStatuses.find(s => s.id === formData.status)?.name
+        warehouse: warehouses.find((w: any) => w.id === formData.warehouse_id)?.name,
+        category: wasteMainCategories.find((c: any) => c.id === formData.main_category_id)?.name,
+        weight: formData.weight || undefined,
+        volume: formData.volume || undefined,
+        count: formData.count || undefined,
+        status: mockWasteStatuses.find((s: any) => s.id === formData.status)?.name
       });
 
       const qrCodeImage = await qrCodeService.generateQRCodeImage(qrData);
@@ -617,14 +781,14 @@ export default function WasteCatalogFormWizard() {
 
       const qrData = qrCodeService.createWasteQRData({
         id: formData.waste_no,
-        name: mockWasteMainCategories.find(c => c.id === formData.main_category_id)?.name || 'مخلفات',
+        name: wasteMainCategories.find((c: any) => c.id === formData.main_category_id)?.name || 'مخلفات',
         wasteNo: formData.waste_no,
-        warehouse: mockWarehouses.find(w => w.id === formData.warehouse_id)?.name,
-        category: mockWasteMainCategories.find(c => c.id === formData.main_category_id)?.name,
-        weight: formData.weight,
-        volume: formData.volume,
-        count: formData.count,
-        status: mockWasteStatuses.find(s => s.id === formData.status)?.name
+        warehouse: warehouses.find((w: any) => w.id === formData.warehouse_id)?.name,
+        category: wasteMainCategories.find((c: any) => c.id === formData.main_category_id)?.name,
+        weight: formData.weight || undefined,
+        volume: formData.volume || undefined,
+        count: formData.count || undefined,
+        status: mockWasteStatuses.find((s: any) => s.id === formData.status)?.name
       });
 
       await qrCodeService.printLabel(qrData);
@@ -794,22 +958,40 @@ export default function WasteCatalogFormWizard() {
         max_storage_days: formData.max_storage_days || undefined,
         alert_on_exceed: formData.alert_on_exceed || false,
         status: formData.status || 'waiting',
-        images: [], // TODO: رفع الصور إلى Supabase Storage
-        documents: [], // TODO: رفع المستندات إلى Supabase Storage
+        images: isEditing ? (initialData?.images || []) : [], // TODO: رفع الصور إلى Supabase Storage
+        documents: isEditing ? (initialData?.documents || []) : [], // TODO: رفع المستندات إلى Supabase Storage
         notes: formData.notes || undefined,
-        emergency_flags: formData.emergency_flags
+        emergency_flags: formData.emergency_flags,
+        qr_code: formData.qr_code || undefined,
+        is_returnable_after_sorting: formData.is_returnable_after_sorting,
+        initial_sorting_from_supplier: formData.initial_sorting_from_supplier || null,
+        initial_sorting_percentage: formData.initial_sorting_percentage,
+        pollution_percentage: formData.pollution_percentage
       };
 
-      const result = await wasteCatalogService.addWaste(wasteData);
+      let result: WasteCatalogItem | null = null;
       
-      if (result) {
-        // إعادة تعيين النموذج
+      if (isEditing && wasteId) {
+        // تحديث المخلفات
+        result = await wasteCatalogService.updateWaste(wasteId, wasteData);
+        if (result) {
+          toast.success('تم تحديث المخلفات بنجاح');
+        }
+      } else {
+        // إضافة مخلفات جديدة
+        result = await wasteCatalogService.addWaste(wasteData);
+        if (result) {
+          toast.success('تم إضافة المخلفات بنجاح');
+        }
+      }
+      
+      if (result && !isEditing) {
+        // إعادة تعيين النموذج فقط عند الإضافة
         setFormData({
           waste_no: '',
           warehouse_id: null,
           registration_date: new Date().toISOString().split('T')[0],
           source: '',
-          // الحقول الجديدة
           sector_id: null,
           client_type_id: null,
           source_code: '',
@@ -861,15 +1043,20 @@ export default function WasteCatalogFormWizard() {
           images: [],
           documents: [],
           notes: '',
+          qr_code: '',
           emergency_flags: {
             urgent_processing: false,
             special_approvals: false,
             health_hazard: false,
             environmental_hazard: false
-          }
+          },
+          is_returnable_after_sorting: false,
+          initial_sorting_from_supplier: '',
+          initial_sorting_percentage: 0,
+          pollution_percentage: 0
         });
-        setCurrentStep(0);
       }
+      setCurrentStep(0);
     } catch (error) {
       toast.error('حدث خطأ أثناء حفظ المخلفات');
     } finally {
@@ -898,7 +1085,8 @@ export default function WasteCatalogFormWizard() {
           <Select
             value={formData.sector_id?.toString() || ''}
             onValueChange={(value) => {
-              handleFormChange('sector_id', Number(value));
+              const numValue = value ? Number(value) : null;
+              handleFormChange('sector_id', numValue);
             }}
           >
             <SelectTrigger>
@@ -1222,9 +1410,9 @@ export default function WasteCatalogFormWizard() {
                     <SelectValue placeholder="اختر نوع البلاستيك" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockPlasticTypes.map(type => (
+                    {plasticTypes.map(type => (
                       <SelectItem key={type.id} value={type.id.toString()}>
-                        {type.name} - {type.description}
+                        {type.name} {type.description ? `- ${type.description}` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1337,7 +1525,7 @@ export default function WasteCatalogFormWizard() {
                     <SelectValue placeholder="اختر نوع المعدن" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockMetalTypes.map(type => (
+                    {metalTypes.map(type => (
                       <SelectItem key={type.id} value={type.id.toString()}>
                         {type.name}
                       </SelectItem>

@@ -71,19 +71,30 @@ export interface WasteCatalogItem {
     health_hazard: boolean;
     environmental_hazard: boolean;
   };
+  // حقول إدارة المخازن الجديدة
+  is_returnable_after_sorting?: boolean; // قابل أن يكون مرتجع بعد الفرز أم لا
+  initial_sorting_from_supplier?: string | null; // الفرز الأولى من المورد
+  initial_sorting_percentage?: number | null; // نسبة الفرز الأولى من المورد
+  pollution_percentage?: number | null; // نسبة مستوى التلوث
   created_at?: string;
+  warehouse?: { name: string };
+  main_category?: { name: string };
+  sub_category?: { name: string };
+  unit?: { name: string };
+  related_product?: { name: string; sku: string };
 }
 
 // واجهات جديدة للنظام المحسن
 export interface WasteSector {
-  id: number;
+  id: number; // العودة إلى number كما في SQL المعطى
   name: string;
   description?: string;
+  code?: string;
 }
 
 export interface ClientType {
   id: number;
-  sector_id: number;
+  sector_id: number; // العودة إلى number
   name: string;
   description?: string;
 }
@@ -95,9 +106,10 @@ export interface SourceReason {
 }
 
 export interface WasteMainCategory {
-  id: number;
+  id: number | string; // تغيير لتسهيل التعامل مع المصادر النصية
   code: string;
   name: string;
+  description?: string;
 }
 
 export interface WasteSubCategory {
@@ -109,13 +121,21 @@ export interface WasteSubCategory {
 
 export interface PlasticType {
   id: number;
-  code: string;
+  sub_id?: number; // رقم التصنيف الفرعي المرتبط
+  code?: string;
   name: string;
   description?: string;
 }
 
 export interface MetalType {
   id: number;
+  sub_id?: number;
+  name: string;
+}
+
+export interface PaperType {
+  id: number;
+  sub_id?: number;
   name: string;
 }
 
@@ -144,15 +164,17 @@ class WasteCatalogService {
   ): Promise<WasteCatalogItem | null> {
     try {
       // تحضير البيانات للحفظ
+      const sourceCode = waste.source_code || (typeof waste.source === 'string' ? waste.source : null);
+      
       const wasteData = {
         ...waste,
         // حفظ الحقول الجديدة
         sector_id: waste.sector_id || null,
         client_type_id: waste.client_type_id || null,
-        source_code: waste.source_code || null,
+        source_code: sourceCode || null,
         reason_id: waste.reason_id || null,
         // الحفاظ على التوافق الخلفي
-        source: waste.source_code || waste.source || null,
+        source: sourceCode || null,
       };
 
       const { data, error } = await supabase!
@@ -796,31 +818,36 @@ class WasteCatalogService {
   // جلب جميع القطاعات
   async getWasteSectors(): Promise<WasteSector[]> {
     try {
+      console.log("جلب القطاعات من جدول waste_sectors...");
       const { data, error } = await supabase!
-        .from("warehouse_sectors")
-        .select("sector_code")
-        .order("sector_code");
+        .from("waste_sectors")
+        .select("id, name, description, code")
+        .order("name");
 
       if (error) {
-        console.error("خطأ في جلب القطاعات:", error);
-        return [];
+        console.error("خطأ في جلب القطاعات من waste_sectors:", error);
+        // محاولة بديلة من warehouse_sectors إذا فشل الأول
+        console.log("محاولة جلب القطاعات من warehouse_sectors كخيار بديل...");
+        const { data: whData, error: whError } = await supabase!
+          .from("warehouse_sectors")
+          .select("id, name, description, code")
+          .eq("is_active", true)
+          .order("name");
+          
+        if (whError) {
+          console.error("خطأ في جلب القطاعات من warehouse_sectors أيضاً:", whError);
+          return [];
+        }
+        
+        return whData?.map(item => ({
+          id: -1, // معرف مؤقت لأن id الأصلي UUID
+          name: item.name,
+          description: item.description,
+          code: item.code
+        })) || [];
       }
 
-      // تحويل البيانات إلى تنسيق WasteSector مع إزالة التكرار
-      const uniqueSectors =
-        data?.reduce((acc: WasteSector[], item: { sector_code: string }) => {
-          const existingSector = acc.find((s) => s.name === item.sector_code);
-          if (!existingSector) {
-            acc.push({
-              id: acc.length + 1, // ID مؤقت
-              name: this.getSectorDisplayName(item.sector_code),
-              description: this.getSectorDescription(item.sector_code),
-            });
-          }
-          return acc;
-        }, []) || [];
-
-      return uniqueSectors;
+      return data || [];
     } catch (error) {
       console.error("خطأ في جلب القطاعات:", error);
       return [];
@@ -874,15 +901,36 @@ class WasteCatalogService {
       const { data, error } = await query;
 
       if (error) {
-        console.error("خطأ في جلب أنواع العملاء:", error);
-        return [];
+        console.warn("خطأ في جلب أنواع العملاء من قاعدة البيانات، استخدام البيانات الافتراضية:", error.message);
+        return this.getDefaultClientTypes(sectorId);
       }
 
-      return data || [];
+      if (data && data.length > 0) {
+        return data;
+      } else {
+        return this.getDefaultClientTypes(sectorId);
+      }
     } catch (error) {
-      console.error("خطأ في جلب أنواع العملاء:", error);
-      return [];
+      console.warn("خطأ في جلب أنواع العملاء، استخدام البيانات الافتراضية");
+      return this.getDefaultClientTypes(sectorId);
     }
+  }
+
+  private getDefaultClientTypes(sectorId?: number): ClientType[] {
+    const allTypes = [
+      { id: 1, sector_id: 1, name: 'مطاعم', description: 'مطاعم وكافيهات' },
+      { id: 2, sector_id: 1, name: 'محلات تجارية', description: 'متاجر تجزئة' },
+      { id: 3, sector_id: 2, name: 'مصانع أغذية', description: 'منشآت إنتاج غذائي' },
+      { id: 4, sector_id: 2, name: 'مصانع بلاستيك', description: 'منشآت إنتاج بلاستيك' },
+      { id: 5, sector_id: 3, name: 'مستشفيات', description: 'منشآت طبية كبرى' },
+      { id: 6, sector_id: 3, name: 'عيادات', description: 'مراكز طبية صغيرة' },
+      { id: 7, sector_id: 4, name: 'منازل', description: 'وحدات سكنية' }
+    ];
+    
+    if (sectorId) {
+      return allTypes.filter(t => t.sector_id === sectorId);
+    }
+    return allTypes;
   }
 
   // جلب المصادر المتاحة حسب القطاع ونوع العميل
@@ -904,25 +952,42 @@ class WasteCatalogService {
         .order("priority_order", { ascending: true });
 
       if (error) {
-        console.error("خطأ في جلب المصادر المتاحة:", error);
-        return [];
+        console.warn("خطأ في جلب المصادر المتاحة من قاعدة البيانات، استخدام البيانات الافتراضية:", error.message);
+        return this.getDefaultAvailableSources();
       }
 
-      return data?.map((item: AvailableSourceData) => {
-        // Handle case where waste_sources might be an array
-        const source = Array.isArray(item.waste_sources)
-          ? item.waste_sources[0]
-          : item.waste_sources;
-        return {
-          id: parseInt(source.id) || 0, // Convert string ID to number
-          code: source.id.toString(),
-          name: source.name,
-        };
-      }) || [];
+      if (data && data.length > 0) {
+        return data?.map((item: AvailableSourceData) => {
+          const source = Array.isArray(item.waste_sources)
+            ? item.waste_sources[0]
+            : item.waste_sources;
+          return {
+            id: source.id,
+            code: source.id,
+            name: source.name,
+            description: source.description || source.name,
+          };
+        });
+      } else {
+        return this.getDefaultAvailableSources();
+      }
     } catch (error) {
-      console.error("خطأ في جلب المصادر المتاحة:", error);
-      return [];
+      console.warn("خطأ في جلب المصادر المتاحة، استخدام البيانات الافتراضية");
+      return this.getDefaultAvailableSources();
     }
+  }
+
+  private getDefaultAvailableSources(): WasteMainCategory[] {
+    return [
+      { id: 'damaged_product', code: 'damaged_product', name: 'منتج تالف' },
+      { id: 'expired_product', code: 'expired_product', name: 'منتج منتهي الصلاحية' },
+      { id: 'empty_containers', code: 'empty_containers', name: 'عبوات فارغة' },
+      { id: 'returns', code: 'returns', name: 'مرتجعات' },
+      { id: 'production_residues', code: 'production_residues', name: 'بقايا إنتاج/تغليف' },
+      { id: 'packaging_materials', code: 'packaging_materials', name: 'مواد تغليف' },
+      { id: 'office_waste', code: 'office_waste', name: 'مخلفات مكتبية' },
+      { id: 'other', code: 'other', name: 'أخرى' }
+    ];
   }
 
   // جلب الأسباب المتاحة حسب المصدر (محدثة)
@@ -946,25 +1011,37 @@ class WasteCatalogService {
         .order("priority_order", { ascending: true });
 
       if (error) {
-        console.error("خطأ في جلب الأسباب المتاحة:", error);
-        return [];
+        console.warn("خطأ في جلب الأسباب المتاحة من قاعدة البيانات، استخدام البيانات الافتراضية:", error.message);
+        return this.getDefaultAvailableReasons();
       }
 
-      return data?.map((item: AvailableReasonData) => {
-        // Handle case where source_reasons might be an array
-        const reason = Array.isArray(item.source_reasons)
-          ? item.source_reasons[0]
-          : item.source_reasons;
-        return {
-          id: reason.id,
-          name: reason.name,
-          description: reason.description,
-        };
-      }) || [];
+      if (data && data.length > 0) {
+        return data?.map((item: AvailableReasonData) => {
+          const reason = Array.isArray(item.source_reasons)
+            ? item.source_reasons[0]
+            : item.source_reasons;
+          return {
+            id: reason.id,
+            name: reason.name,
+            description: reason.description,
+          };
+        });
+      } else {
+        return this.getDefaultAvailableReasons();
+      }
     } catch (error) {
-      console.error("خطأ في جلب الأسباب المتاحة:", error);
-      return [];
+      console.warn("خطأ في جلب الأسباب المتاحة، استخدام البيانات الافتراضية");
+      return this.getDefaultAvailableReasons();
     }
+  }
+
+  private getDefaultAvailableReasons(): SourceReason[] {
+    return [
+      { id: 1, name: 'تلف ناتج عن سوء التخزين', description: 'تلف بسبب ظروف تخزين غير مناسبة' },
+      { id: 2, name: 'انتهاء الصلاحية', description: 'تجاوز تاريخ الاستخدام الموصى به' },
+      { id: 3, name: 'كسر أو ضرر مادي', description: 'ضرر ناتج عن السقوط أو الضغط' },
+      { id: 4, name: 'عيب مصنعي', description: 'مشكلة ناتجة عن عملية الإنتاج' }
+    ];
   }
 
   // دالة مساعدة لتحديد نوع مصدر البيانات
@@ -1162,6 +1239,116 @@ class WasteCatalogService {
         }`,
       );
       return false;
+    }
+  }
+
+  // جلب أنواع البلاستيك (المستوى الثالث)
+  async getPlasticTypes(subCategoryId?: number): Promise<PlasticType[]> {
+    try {
+      let query = supabase!.from("plastic_types").select("*");
+      
+      if (subCategoryId) {
+        query = query.eq("sub_id", subCategoryId);
+      }
+      
+      const { data, error } = await query.order("name");
+
+      if (error) {
+        console.warn("خطأ في جلب أنواع البلاستيك:", error.message);
+        return this.getDefaultPlasticTypes();
+      }
+
+      return (data && data.length > 0) ? data : this.getDefaultPlasticTypes();
+    } catch (error) {
+      return this.getDefaultPlasticTypes();
+    }
+  }
+
+  private getDefaultPlasticTypes(): PlasticType[] {
+    return [
+      { id: 1, code: 'PET', name: 'PET (1)', description: 'بولي إيثيلين تيريفثاليت - زجاجات المياه والمشروبات' },
+      { id: 2, code: 'HDPE', name: 'HDPE (2)', description: 'بولي إيثيلين عالي الكثافة - عبوات المنظفات والشامبو' },
+      { id: 3, code: 'PVC', name: 'PVC (3)', description: 'بولي فينيل كلوريد - أنابيب ومواد بناء' },
+      { id: 4, code: 'LDPE', name: 'LDPE (4)', description: 'بولي إيثيلين منخفض الكثافة - أكياس التسوق' },
+      { id: 5, code: 'PP', name: 'PP (5)', description: 'بولي بروبيلين - أغطية الزجاجات وعلب الزبادي' },
+      { id: 6, code: 'PS', name: 'PS (6)', description: 'بوليسترين - أكواب القهوة وعلب الطعام' },
+      { id: 7, code: 'OTHER', name: 'OTHER (7)', description: 'أنواع أخرى من البلاستيك' }
+    ];
+  }
+
+  // جلب أنواع المعادن (المستوى الثالث)
+  async getMetalTypes(subCategoryId?: number): Promise<MetalType[]> {
+    try {
+      let query = supabase!.from("metal_types").select("*");
+      
+      if (subCategoryId) {
+        query = query.eq("sub_id", subCategoryId);
+      }
+
+      const { data, error } = await query.order("name");
+
+      if (error) {
+        console.warn("خطأ في جلب أنواع المعادن:", error.message);
+        return this.getDefaultMetalTypes();
+      }
+
+      return (data && data.length > 0) ? data : this.getDefaultMetalTypes();
+    } catch (error) {
+      return this.getDefaultMetalTypes();
+    }
+  }
+
+  private getDefaultMetalTypes(): MetalType[] {
+    return [
+      { id: 1, name: 'ألمنيوم (Aluminum)' },
+      { id: 2, name: 'حديد (Iron/Steel)' },
+      { id: 3, name: 'نحاس (Copper)' },
+      { id: 4, name: 'نحاس أصفر (Brass)' },
+      { id: 5, name: 'رصاص (Lead)' },
+      { id: 6, name: 'ستانلس ستيل (Stainless Steel)' },
+      { id: 7, name: 'خردة مختلطة (Mixed Scrap)' }
+    ];
+  }
+
+  // إضافة نوع بلاستيك جديد
+  async addPlasticType(plasticType: { code: string; name: string; description?: string }): Promise<PlasticType | null> {
+    try {
+      const { data, error } = await supabase!
+        .from("plastic_types")
+        .insert([plasticType])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("خطأ في إضافة نوع البلاستيك:", error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error("خطأ في إضافة نوع البلاستيك:", error);
+      return null;
+    }
+  }
+
+  // إضافة نوع معدن جديد
+  async addMetalType(metalType: { name: string }): Promise<MetalType | null> {
+    try {
+      const { data, error } = await supabase!
+        .from("metal_types")
+        .insert([metalType])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("خطأ في إضافة نوع المعدن:", error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error("خطأ في إضافة نوع المعدن:", error);
+      return null;
     }
   }
 }

@@ -43,6 +43,10 @@ export interface ProductCatalogItem {
   notes?: string;
   images?: string[];
   created_at?: string;
+  warehouse?: { name: string };
+  main_category?: { name: string };
+  sub_category?: { name: string };
+  unit?: { name: string };
 }
 
 export interface ProductMainCategory {

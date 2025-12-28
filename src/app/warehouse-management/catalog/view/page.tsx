@@ -14,13 +14,18 @@ import { toast } from 'sonner';
 import { productCatalogService, ProductCatalogItem } from '@/services/productCatalogService';
 import { wasteCatalogService, WasteCatalogItem } from '@/services/wasteCatalogService';
 import { qrCodeService } from '@/services/qrCodeService';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/shared/ui/dialog';
 import Link from 'next/link';
 
 export default function CatalogViewPage() {
   const [activeTab, setActiveTab] = useState('products');
   const [products, setProducts] = useState<ProductCatalogItem[]>([]);
   const [wasteMaterials, setWasteMaterials] = useState<WasteCatalogItem[]>([]);
+  const [wasteMainCategories, setWasteMainCategories] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<ProductCatalogItem | null>(null);
+  const [selectedWaste, setSelectedWaste] = useState<WasteCatalogItem | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   
   // فلاتر البحث
   const [productFilters, setProductFilters] = useState({
@@ -41,7 +46,17 @@ export default function CatalogViewPage() {
   useEffect(() => {
     loadProducts();
     loadWasteMaterials();
+    loadCategories();
   }, []);
+
+  const loadCategories = async () => {
+    try {
+      const data = await wasteCatalogService.getWasteMainCategories();
+      setWasteMainCategories(data);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
 
   const loadProducts = async () => {
     setIsLoading(true);
@@ -90,7 +105,7 @@ export default function CatalogViewPage() {
   const filteredWasteMaterials = wasteMaterials.filter(waste => {
     const matchesSearch = !wasteFilters.search || 
       waste.waste_no.toLowerCase().includes(wasteFilters.search.toLowerCase()) ||
-      (waste as any).main_category?.name?.toLowerCase().includes(wasteFilters.search.toLowerCase());
+      waste.main_category?.name?.toLowerCase().includes(wasteFilters.search.toLowerCase());
     
     const matchesCategory = !wasteFilters.category || wasteFilters.category === 'all' || 
       waste.main_category_id?.toString() === wasteFilters.category;
@@ -131,8 +146,8 @@ export default function CatalogViewPage() {
         id: product.id?.toString() || product.sku,
         name: product.name,
         sku: product.sku,
-        warehouse: (product as any).warehouse?.name,
-        category: (product as any).main_category?.name,
+        warehouse: product.warehouse?.name,
+        category: product.main_category?.name,
         weight: product.weight,
         volume: product.unit_mode === 'volume' ? product.weight : undefined,
         count: product.unit_mode === 'count' ? product.weight : undefined,
@@ -150,14 +165,14 @@ export default function CatalogViewPage() {
     try {
       const qrData = qrCodeService.createWasteQRData({
         id: waste.id?.toString() || waste.waste_no,
-        name: (waste as any).main_category?.name || 'مخلفات',
+        name: waste.main_category?.name || 'مخلفات',
         wasteNo: waste.waste_no,
-        warehouse: (waste as any).warehouse?.name,
-        category: (waste as any).main_category?.name,
+        warehouse: waste.warehouse?.name,
+        category: waste.main_category?.name,
         weight: waste.weight,
         volume: waste.volume,
         count: waste.count,
-        status: (waste as any).status
+        status: waste.status
       });
       
       await qrCodeService.printLabel(qrData);
@@ -345,10 +360,10 @@ export default function CatalogViewPage() {
                                 <span className="font-medium">كود المنتج:</span> {product.product_code}
                               </div>
                               <div>
-                                <span className="font-medium">المخزن:</span> {(product as any).warehouse?.name || 'غير محدد'}
+                                <span className="font-medium">المخزن:</span> {product.warehouse?.name || 'غير محدد'}
                               </div>
                               <div>
-                                <span className="font-medium">الفئة:</span> {(product as any).main_category?.name || 'غير محدد'}
+                                <span className="font-medium">الفئة:</span> {product.main_category?.name || 'غير محدد'}
                               </div>
                               {product.weight && (
                                 <div>
@@ -386,9 +401,14 @@ export default function CatalogViewPage() {
                               variant="outline"
                               size="sm"
                               title="عرض التفاصيل"
-                            >
-                              <FiEye />
-                            </Button>
+                               onClick={() => {
+                                 setSelectedProduct(product);
+                                 setSelectedWaste(null);
+                                 setIsDetailsOpen(true);
+                               }}
+                             >
+                               <FiEye />
+                             </Button>
                             <Link href={`/warehouse-management/catalog/edit/${product.id}`}>
                               <Button
                                 variant="outline"
@@ -453,14 +473,11 @@ export default function CatalogViewPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">جميع الفئات</SelectItem>
-                        <SelectItem value="1">بلاستيك</SelectItem>
-                        <SelectItem value="2">معادن</SelectItem>
-                        <SelectItem value="3">كرتون/ورق</SelectItem>
-                        <SelectItem value="4">زجاج</SelectItem>
-                        <SelectItem value="5">أقمشة/نسيج</SelectItem>
-                        <SelectItem value="6">مواد عضوية</SelectItem>
-                        <SelectItem value="7">إلكترونيات</SelectItem>
-                        <SelectItem value="8">أخرى</SelectItem>
+                        {wasteMainCategories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id.toString()}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -499,16 +516,18 @@ export default function CatalogViewPage() {
                             <div className="flex items-center gap-2 mb-2">
                               <h3 className="font-semibold text-lg">{waste.waste_no}</h3>
                               <Badge variant={
-                                waste.status === 'ready' ? 'default' :
+                                waste.status === 'ready' || waste.status === 'available' ? 'default' :
                                 waste.status === 'waiting' ? 'secondary' :
-                                waste.status === 'sold' ? 'default' : 'destructive'
+                                waste.status === 'sold' ? 'default' : 
+                                (waste.status === 'cancelled' || waste.status === 'disposed') ? 'destructive' : 'outline'
                               }>
                                 {waste.status === 'waiting' ? 'في الانتظار' :
                                  waste.status === 'sorting' ? 'قيد الفرز' :
-                                 waste.status === 'ready' ? 'جاهز للبيع' :
+                                 waste.status === 'ready' || waste.status === 'available' ? 'جاهز للبيع' :
                                  waste.status === 'reserved' ? 'محجوز' :
                                  waste.status === 'sold' ? 'تم البيع' :
-                                 waste.status === 'disposed' ? 'تم الإتلاف' : 'ملغي'}
+                                 waste.status === 'disposed' ? 'تم الإتلاف' : 
+                                 waste.status === 'cancelled' ? 'ملغي' : 'غير محدد'}
                               </Badge>
                               {waste.recyclable && (
                                 <Badge variant="outline" className="text-green-600">
@@ -518,10 +537,10 @@ export default function CatalogViewPage() {
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
                               <div>
-                                <span className="font-medium">المخزن:</span> {(waste as any).warehouse?.name || 'غير محدد'}
+                                <span className="font-medium">المخزن:</span> {waste.warehouse?.name || 'غير محدد'}
                               </div>
                               <div>
-                                <span className="font-medium">الفئة:</span> {(waste as any).main_category?.name || 'غير محدد'}
+                                <span className="font-medium">الفئة:</span> {waste.main_category?.name || 'غير محدد'}
                               </div>
                               {waste.weight && (
                                 <div>
@@ -569,16 +588,23 @@ export default function CatalogViewPage() {
                               variant="outline"
                               size="sm"
                               title="عرض التفاصيل"
-                            >
-                              <FiEye />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              title="تعديل"
-                            >
-                              <FiEdit />
-                            </Button>
+                               onClick={() => {
+                                 setSelectedWaste(waste);
+                                 setSelectedProduct(null);
+                                 setIsDetailsOpen(true);
+                               }}
+                             >
+                               <FiEye />
+                             </Button>
+                            <Link href={`/warehouse-management/catalog/waste-edit/${waste.id}`}>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                title="تعديل"
+                              >
+                                <FiEdit />
+                              </Button>
+                            </Link>
                             <Button
                               variant="destructive"
                               size="sm"
@@ -603,6 +629,179 @@ export default function CatalogViewPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* نافذة تفاصيل العنصر */}
+      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">
+              {selectedProduct ? 'تفاصيل المنتج' : 'تفاصيل المخلفات'}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedProduct ? `عرض بيانات المنتج: ${selectedProduct.name}` : `عرض بيانات المخلفات: ${selectedWaste?.waste_no}`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedProduct && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+              <div className="space-y-4">
+                <div className="aspect-square relative bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+                  <div className="text-gray-400">لا يوجد صور حالياً</div>
+                </div>
+                {selectedProduct.qr_code && (
+                  <div className="p-4 border rounded-lg flex flex-col items-center">
+                    <p className="text-sm text-gray-500 mb-2">QR Code</p>
+                    <img src={selectedProduct.qr_code} alt="QR Code" className="w-32 h-32" />
+                  </div>
+                )}
+              </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">اسم المنتج</p>
+                    <p className="font-semibold">{selectedProduct.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">SKU</p>
+                    <p className="font-semibold">{selectedProduct.sku}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">الفئة الأساسية</p>
+                    <p className="font-semibold">{selectedProduct.main_category?.name || 'غير محدد'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">الفئة الفرعية</p>
+                    <p className="font-semibold">{selectedProduct.sub_category?.name || 'غير محدد'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">المخزن</p>
+                    <p className="font-semibold">{selectedProduct.warehouse?.name || 'غير محدد'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">الحالة</p>
+                    <Badge variant={selectedProduct.status === 'active' ? 'default' : 'secondary'}>
+                      {selectedProduct.status === 'active' ? 'نشط' : selectedProduct.status}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">الكمية القصوى</p>
+                    <p className="font-semibold">{selectedProduct.max_qty || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">الكمية الدنيا</p>
+                    <p className="font-semibold">{selectedProduct.min_qty || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">الوحدة</p>
+                    <p className="font-semibold">{selectedProduct.unit?.name || 'غير محدد'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">البراند</p>
+                    <p className="font-semibold">{selectedProduct.brand || 'غير محدد'}</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">الوصف</p>
+                  <p className="text-gray-700">{selectedProduct.description || 'لا يوجد وصف'}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedWaste && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+              <div className="space-y-4">
+                <div className="aspect-square relative bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+                   <div className="text-gray-400">لا يوجد صور حالياً</div>
+                </div>
+                {selectedWaste.qr_code && (
+                  <div className="p-4 border rounded-lg flex flex-col items-center">
+                    <p className="text-sm text-gray-500 mb-2">QR Code</p>
+                    <img src={selectedWaste.qr_code} alt="QR Code" className="w-32 h-32" />
+                  </div>
+                )}
+              </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">رقم المخلفات</p>
+                    <p className="font-semibold">{selectedWaste.waste_no}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">تاريخ التسجيل</p>
+                    <p className="font-semibold">{selectedWaste.registration_date}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">المخزن</p>
+                    <p className="font-semibold">{selectedWaste.warehouse?.name || 'غير محدد'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">الفئة الأساسية</p>
+                    <p className="font-semibold">{selectedWaste.main_category?.name || 'غير محدد'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">الفئة الفرعية</p>
+                    <p className="font-semibold">{selectedWaste.sub_category?.name || 'غير محدد'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">الحالة</p>
+                    <Badge variant={
+                      selectedWaste.status === 'ready' || selectedWaste.status === 'available' ? 'default' :
+                      selectedWaste.status === 'waiting' ? 'secondary' : 'outline'
+                    }>
+                      {selectedWaste.status === 'available' ? 'جاهز للبيع' : 
+                       selectedWaste.status === 'ready' ? 'جاهز للبيع' :
+                       selectedWaste.status === 'waiting' ? 'في الانتظار' : selectedWaste.status}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">الوزن</p>
+                    <p className="font-semibold">{selectedWaste.weight || 0} {selectedWaste.unit?.name || 'كجم'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">القابلية للتدوير</p>
+                    <Badge variant={selectedWaste.recyclable ? 'default' : 'secondary'}>
+                      {selectedWaste.recyclable ? 'نعم' : 'لا'}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">الوحدة</p>
+                    <p className="font-semibold">{selectedWaste.unit?.name || 'غير محدد'}</p>
+                  </div>
+                  {selectedWaste.related_product && (
+                    <div>
+                      <p className="text-sm text-gray-500">المنتج المرتبط</p>
+                      <p className="font-semibold">{selectedWaste.related_product.name}</p>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">المصدر</p>
+                  <p className="font-semibold">{selectedWaste.source || 'غير محدد'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">ملاحظات</p>
+                  <p className="text-gray-700">{selectedWaste.notes || 'لا يوجد ملاحظات'}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 mt-8">
+            <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>إغلاق</Button>
+            {selectedProduct && (
+              <Link href={`/warehouse-management/catalog/edit/${selectedProduct.id}`}>
+                <Button>تعديل البيانات</Button>
+              </Link>
+            )}
+            {selectedWaste && (
+              <Link href={`/warehouse-management/catalog/waste-edit/${selectedWaste.id}`}>
+                <Button>تعديل البيانات</Button>
+              </Link>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

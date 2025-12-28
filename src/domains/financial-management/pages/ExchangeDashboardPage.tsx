@@ -307,8 +307,10 @@ const ExchangeDashboardPage: React.FC = () => {
   };
 
   const filteredExchangeData = prices.filter((item) => {
-    const itemName = item.product?.name || item.product_id;
-    const matchesSearch = itemName?.toLowerCase().includes(searchTerm.toLowerCase());
+    const itemName = item.catalog_item?.name || item.product?.name || item.product_id;
+    const wasteNo = item.catalog_item?.waste_no || '';
+    const matchesSearch = itemName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         wasteNo.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
 
@@ -513,11 +515,11 @@ const ExchangeDashboardPage: React.FC = () => {
                 </TableHeader>
                 <TableBody>
                   {filteredExchangeData.map((item, index: number) => {
-                     const marketPrice = getMarketPrice(item.product?.name || '');
+                     const itemName = item.catalog_item?.name || item.product?.name || item.product_id;
+                     const marketPrice = getMarketPrice(itemName);
                      const sellPrice = marketPrice || item.sell_price || (item.base_price * 1.2);
                      
                      // Fix 99% Margin Issue: Normalize units for comparison
-                     // If sellPrice is > 500, it's likely per Ton. Convert buy_price (Kg) to Ton for accurate margin calc.
                      const normalizedBuyPrice = sellPrice > 500 ? (item.buy_price * 1000) : item.buy_price;
                      
                      const { marginPercent } = calculateMargin(normalizedBuyPrice, sellPrice);
@@ -527,13 +529,19 @@ const ExchangeDashboardPage: React.FC = () => {
                          <TableCell className="text-center text-gray-400 font-medium">{index + 1}</TableCell>
                          <TableCell className="font-semibold text-gray-800 text-base">
                             <div className="flex flex-col">
-                               <span>{item.product?.name || item.product_id}</span>
-                               <span className="text-xs text-muted-foreground font-normal">{item.category?.name}</span>
+                               <span>{itemName}</span>
+                               <div className="flex items-center gap-2 mt-0.5">
+                                 <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold border border-blue-100">
+                                   {item.catalog_item?.waste_no || 'بدون كود'}
+                                 </span>
+                                 <span className="text-xs text-muted-foreground font-normal">
+                                   {(item.catalog_item?.main_category as any)?.name || item.category?.name || 'تصنيف عام'}
+                                 </span>
+                               </div>
                             </div>
                          </TableCell>
                          <TableCell className="text-center font-medium text-gray-500">{item.base_price?.toFixed(2)}</TableCell>
                          
-                         {/* عمود سعر البيع (السوق) */}
                          <TableCell className="text-center font-semibold text-gray-700">
                             {marketPrice ? (
                                 <div className="flex flex-col items-center">

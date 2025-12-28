@@ -19,7 +19,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="ar" dir="ltr" className="h-full" suppressHydrationWarning>
       <StoreProvider>
-        <body className="h-full">
+        <body className="h-full" suppressHydrationWarning>
           <ThemeProvider>
             <AuthProvider>
               <ToastProvider>

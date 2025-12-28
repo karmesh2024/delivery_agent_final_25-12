@@ -1,0 +1,1 @@
+اريدك ان تلاحظ اننا انشائنا دالة D:\karmesh_githup\delivery-agent-dashboard\supabase\functions\create-payout-request بنجاح وكان هذا المستند D:\karmesh_githup\delivery-agent-dashboard\src\domains\payments\docs\توثيق نظام المدفوعات والمحافظ المالية\edge_functions_migration_plan.md 

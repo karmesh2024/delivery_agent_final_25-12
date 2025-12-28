@@ -24,6 +24,12 @@ export interface StockExchange {
   category?: { name: string };
   subcategory?: { name: string };
   product?: { name: string };
+  catalog_item?: {
+    waste_no: string;
+    name: string;
+    main_category?: { name: string };
+    sub_category?: { name: string };
+  };
   // حقول إضافية للعرض (يمكن حسابها أو جلبها)
   total_available_stock?: number;
 }
@@ -55,11 +61,14 @@ export const exchangeService = {
         .from("stock_exchange")
         .select(`
           *,
-          category:categories(name),
-          subcategory:subcategories(name),
-          product:waste_data_admin(name)
+          catalog_item:catalog_waste_materials(
+            waste_no,
+            name,
+            main_category:waste_main_categories(name),
+            sub_category:waste_sub_categories(name)
+          )
         `)
-        .order("category_id");
+        .order("id");
 
       if (error) {
         throw error;
@@ -105,10 +114,14 @@ export const exchangeService = {
 
   async getMarketTrends() {
     try {
+      if (!supabase) {
+        console.error("Supabase client is not initialized.");
+        return [];
+      }
       // Fetch the latest history entry for each item to show immediate trends
       // We use a workaround since 'distinct on' might be tricky with simple client
       // We fetch the last 100 history items and process in JS for now (simpler than complex SQL view update)
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from("exchange_price_history")
         .select("stock_exchange_id, old_buy_price, new_buy_price, created_at")
         .order("created_at", { ascending: false })
@@ -245,7 +258,7 @@ export const exchangeService = {
     try {
       if (!supabase) return;
 
-      const { error } = await supabase
+      const { error } = await supabase!
         .from("exchange_price_history")
         .insert([{
           ...log,
