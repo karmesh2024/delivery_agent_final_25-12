@@ -86,7 +86,7 @@ export interface WasteCatalogItem {
 
 // واجهات جديدة للنظام المحسن
 export interface WasteSector {
-  id: number; // العودة إلى number كما في SQL المعطى
+  id: number | string; // دعم number (للجداول القديمة) و string/UUID (للجداول الجديدة)
   name: string;
   description?: string;
   code?: string;
@@ -163,11 +163,204 @@ class WasteCatalogService {
     waste: Omit<WasteCatalogItem, "id" | "created_at">,
   ): Promise<WasteCatalogItem | null> {
     try {
+      // تحويل UUID من unified_main_categories إلى bigint من waste_main_categories
+      let mainCategoryIdBigInt: number | null = null;
+      let subCategoryIdBigInt: number | null = null;
+
+      if (waste.main_category_id) {
+        // إذا كان UUID (string)، نحتاج للبحث عن code ثم bigint
+        const mainCategoryIdStr = waste.main_category_id.toString();
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(mainCategoryIdStr);
+        
+        if (isUUID) {
+          // البحث عن code في unified_main_categories
+          const { data: unifiedMainCategory } = await supabase!
+            .from("unified_main_categories")
+            .select("code")
+            .eq("id", mainCategoryIdStr)
+            .single();
+          
+          if (unifiedMainCategory?.code) {
+            // البحث عن bigint في waste_main_categories
+            let { data: oldMainCategory, error: oldCategoryError } = await supabase!
+              .from("waste_main_categories")
+              .select("id")
+              .eq("code", unifiedMainCategory.code)
+              .maybeSingle();
+            
+            if (oldMainCategory && !oldCategoryError) {
+              mainCategoryIdBigInt = Number(oldMainCategory.id);
+            } else {
+              // إذا لم نجد في الجدول القديم، ننشئ سجل جديد
+              console.log(`📝 إنشاء سجل جديد في waste_main_categories للكود ${unifiedMainCategory.code}`);
+              
+              // جلب اسم الفئة من unified_main_categories
+              const { data: fullCategory } = await supabase!
+                .from("unified_main_categories")
+                .select("name, name_ar, description")
+                .eq("id", mainCategoryIdStr)
+                .single();
+              
+              // إنشاء سجل جديد في waste_main_categories
+              // ملاحظة: waste_main_categories يحتوي فقط على id, code, name (لا يوجد description أو is_active)
+              const insertData: { code: string; name: string } = {
+                code: unifiedMainCategory.code,
+                name: fullCategory?.name_ar || fullCategory?.name || unifiedMainCategory.code,
+              };
+              
+              const { data: newMainCategory, error: insertError } = await supabase!
+                .from("waste_main_categories")
+                .insert(insertData)
+                .select("id")
+                .single();
+              
+              if (newMainCategory && !insertError) {
+                mainCategoryIdBigInt = Number(newMainCategory.id);
+                console.log(`✅ تم إنشاء الفئة الأساسية بنجاح: ${mainCategoryIdBigInt}`);
+              } else {
+                // إذا فشل الإدراج (مثلاً بسبب duplicate code)، نحاول البحث مرة أخرى
+                if (insertError?.code === '23505' || insertError?.message?.includes('duplicate') || insertError?.message?.includes('unique')) {
+                  console.log(`⚠️ الكود موجود بالفعل، البحث مرة أخرى...`);
+                  const { data: existingCategory } = await supabase!
+                    .from("waste_main_categories")
+                    .select("id")
+                    .eq("code", unifiedMainCategory.code)
+                    .maybeSingle();
+                  
+                  if (existingCategory) {
+                    mainCategoryIdBigInt = Number(existingCategory.id);
+                    console.log(`✅ تم العثور على الفئة الأساسية الموجودة: ${mainCategoryIdBigInt}`);
+                  } else {
+                    console.error(`❌ فشل في إنشاء الفئة الأساسية:`, insertError);
+                    mainCategoryIdBigInt = null;
+                  }
+                } else {
+                  console.error(`❌ فشل في إنشاء الفئة الأساسية:`, insertError);
+                  mainCategoryIdBigInt = null;
+                }
+              }
+            }
+          }
+        } else {
+          // إذا كان bigint بالفعل، استخدمه مباشرة
+          mainCategoryIdBigInt = Number(waste.main_category_id);
+        }
+      }
+
+      if (waste.sub_category_id) {
+        const subCategoryIdStr = waste.sub_category_id.toString();
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subCategoryIdStr);
+        
+        if (isUUID) {
+          // البحث عن code في unified_sub_categories
+          const { data: unifiedSubCategory } = await supabase!
+            .from("unified_sub_categories")
+            .select("code")
+            .eq("id", subCategoryIdStr)
+            .single();
+          
+          if (unifiedSubCategory?.code) {
+            // البحث عن bigint في waste_sub_categories
+            // إذا لم نجد في الجدول القديم، نستخدم null
+            const { data: oldSubCategory, error: oldSubCategoryError } = await supabase!
+              .from("waste_sub_categories")
+              .select("id")
+              .eq("code", unifiedSubCategory.code)
+              .single();
+            
+            if (oldSubCategory && !oldSubCategoryError) {
+              subCategoryIdBigInt = Number(oldSubCategory.id);
+            } else {
+              // إذا لم نجد في الجدول القديم، ننشئ سجل جديد
+              console.log(`📝 إنشاء سجل جديد في waste_sub_categories للكود ${unifiedSubCategory.code}`);
+              
+              // جلب اسم الفئة من unified_sub_categories
+              const { data: fullSubCategory } = await supabase!
+                .from("unified_sub_categories")
+                .select("name, name_ar, main_category_id")
+                .eq("id", subCategoryIdStr)
+                .single();
+              
+              // نحتاج لـ main_category_id في waste_main_categories (bigint)
+              let mainCategoryIdForSub: number | null = null;
+              if (fullSubCategory?.main_category_id) {
+                // البحث عن main_category_id في waste_main_categories
+                const { data: mainCatInUnified } = await supabase!
+                  .from("unified_main_categories")
+                  .select("code")
+                  .eq("id", fullSubCategory.main_category_id)
+                  .single();
+                
+                if (mainCatInUnified?.code) {
+                  const { data: oldMainCat } = await supabase!
+                    .from("waste_main_categories")
+                    .select("id")
+                    .eq("code", mainCatInUnified.code)
+                    .maybeSingle();
+                  
+                  if (oldMainCat) {
+                    mainCategoryIdForSub = Number(oldMainCat.id);
+                  }
+                }
+              }
+              
+              // إنشاء سجل جديد في waste_sub_categories
+              // ملاحظة: waste_sub_categories يحتوي فقط على id, code, name, main_id (لا يوجد description أو is_active)
+              const insertSubData: { code: string; name: string; main_id?: number | null } = {
+                code: unifiedSubCategory.code,
+                name: fullSubCategory?.name_ar || fullSubCategory?.name || unifiedSubCategory.code,
+              };
+              
+              if (mainCategoryIdForSub !== null) {
+                insertSubData.main_id = mainCategoryIdForSub;
+              }
+              
+              const { data: newSubCategory, error: insertSubError } = await supabase!
+                .from("waste_sub_categories")
+                .insert(insertSubData)
+                .select("id")
+                .single();
+              
+              if (newSubCategory && !insertSubError) {
+                subCategoryIdBigInt = Number(newSubCategory.id);
+                console.log(`✅ تم إنشاء الفئة الفرعية بنجاح: ${subCategoryIdBigInt}`);
+              } else {
+                // إذا فشل الإدراج (مثلاً بسبب duplicate code)، نحاول البحث مرة أخرى
+                if (insertSubError?.code === '23505' || insertSubError?.message?.includes('duplicate') || insertSubError?.message?.includes('unique')) {
+                  console.log(`⚠️ الكود موجود بالفعل، البحث مرة أخرى...`);
+                  const { data: existingSubCategory } = await supabase!
+                    .from("waste_sub_categories")
+                    .select("id")
+                    .eq("code", unifiedSubCategory.code)
+                    .maybeSingle();
+                  
+                  if (existingSubCategory) {
+                    subCategoryIdBigInt = Number(existingSubCategory.id);
+                    console.log(`✅ تم العثور على الفئة الفرعية الموجودة: ${subCategoryIdBigInt}`);
+                  } else {
+                    console.error(`❌ فشل في إنشاء الفئة الفرعية:`, insertSubError);
+                    subCategoryIdBigInt = null;
+                  }
+                } else {
+                  console.error(`❌ فشل في إنشاء الفئة الفرعية:`, insertSubError);
+                  subCategoryIdBigInt = null;
+                }
+              }
+            }
+          }
+        } else {
+          subCategoryIdBigInt = Number(waste.sub_category_id);
+        }
+      }
+
       // تحضير البيانات للحفظ
       const sourceCode = waste.source_code || (typeof waste.source === 'string' ? waste.source : null);
       
       const wasteData = {
         ...waste,
+        // استخدام bigint IDs للحفظ
+        main_category_id: mainCategoryIdBigInt,
+        sub_category_id: subCategoryIdBigInt,
         // حفظ الحقول الجديدة
         sector_id: waste.sector_id || null,
         client_type_id: waste.client_type_id || null,
@@ -203,14 +396,181 @@ class WasteCatalogService {
   }
 
   // تحديث مخلفات موجودة
-  async updateWaste(
-    id: number,
-    waste: Partial<WasteCatalogItem>,
-  ): Promise<WasteCatalogItem | null> {
+  // جلب مخلف واحد بالمعرف
+  async getWasteMaterialById(id: string | number): Promise<WasteCatalogItem | null> {
     try {
       const { data, error } = await supabase!
         .from("catalog_waste_materials")
-        .update(waste)
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("خطأ في جلب المخلف:", error);
+        return null;
+      }
+
+      if (!data) return null;
+
+      // استخدام نفس منطق getWasteMaterials لتحويل البيانات
+      const items = await this.getWasteMaterials();
+      return items.find(item => item.id?.toString() === id.toString()) || null;
+    } catch (error) {
+      console.error("خطأ في جلب المخلف:", error);
+      return null;
+    }
+  }
+
+  async updateWaste(
+    id: number | string,
+    waste: Partial<WasteCatalogItem>,
+  ): Promise<WasteCatalogItem | null> {
+    try {
+      // تحويل UUID من unified_main_categories إلى bigint من waste_main_categories
+      let mainCategoryIdBigInt: number | null | undefined = undefined;
+      let subCategoryIdBigInt: number | null | undefined = undefined;
+
+      if (waste.main_category_id !== undefined) {
+        if (waste.main_category_id === null) {
+          mainCategoryIdBigInt = null;
+        } else {
+          const mainCategoryIdStr = waste.main_category_id.toString();
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(mainCategoryIdStr);
+          
+          if (isUUID) {
+            // البحث عن code في unified_main_categories
+            const { data: unifiedMainCategory } = await supabase!
+              .from("unified_main_categories")
+              .select("code")
+              .eq("id", mainCategoryIdStr)
+              .single();
+            
+          if (unifiedMainCategory?.code) {
+            // البحث عن bigint في waste_main_categories
+            // إذا لم نجد في الجدول القديم، نستخدم null (سيتم التعامل معه لاحقاً)
+            const { data: oldMainCategory, error: oldCategoryError } = await supabase!
+              .from("waste_main_categories")
+              .select("id")
+              .eq("code", unifiedMainCategory.code)
+              .maybeSingle(); // استخدام maybeSingle بدلاً من single لتجنب الخطأ 406
+            
+            if (oldMainCategory && !oldCategoryError) {
+              mainCategoryIdBigInt = Number(oldMainCategory.id);
+            } else {
+              // إذا لم نجد في الجدول القديم، نستخدم null
+              // catalog_waste_materials يتوقع bigint، لكن يمكن أن يكون null
+              console.warn(`⚠️ لم يتم العثور على الفئة الأساسية بالكود ${unifiedMainCategory.code} في waste_main_categories. سيتم حفظ null.`);
+              mainCategoryIdBigInt = null;
+            }
+          }
+          } else {
+            mainCategoryIdBigInt = Number(waste.main_category_id);
+          }
+        }
+      }
+
+      if (waste.sub_category_id !== undefined) {
+        if (waste.sub_category_id === null) {
+          subCategoryIdBigInt = null;
+        } else {
+          const subCategoryIdStr = waste.sub_category_id.toString();
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subCategoryIdStr);
+          
+          if (isUUID) {
+            // البحث عن code في unified_sub_categories
+            const { data: unifiedSubCategory } = await supabase!
+              .from("unified_sub_categories")
+              .select("code")
+              .eq("id", subCategoryIdStr)
+              .single();
+            
+          if (unifiedSubCategory?.code) {
+            // البحث عن bigint في waste_sub_categories
+            let { data: oldSubCategory, error: oldSubCategoryError } = await supabase!
+              .from("waste_sub_categories")
+              .select("id")
+              .eq("code", unifiedSubCategory.code)
+              .maybeSingle();
+            
+            if (oldSubCategory && !oldSubCategoryError) {
+              subCategoryIdBigInt = Number(oldSubCategory.id);
+            } else {
+              // إذا لم نجد في الجدول القديم، ننشئ سجل جديد
+              console.log(`📝 إنشاء سجل جديد في waste_sub_categories للكود ${unifiedSubCategory.code}`);
+              
+              // جلب اسم الفئة من unified_sub_categories
+              const { data: fullSubCategory } = await supabase!
+                .from("unified_sub_categories")
+                .select("name, name_ar, description, main_category_id")
+                .eq("id", subCategoryIdStr)
+                .single();
+              
+              // نحتاج لـ main_category_id في waste_main_categories (bigint)
+              let mainCategoryIdForSub: number | null = null;
+              if (fullSubCategory?.main_category_id) {
+                // البحث عن main_category_id في waste_main_categories
+                const { data: mainCatInOld } = await supabase!
+                  .from("unified_main_categories")
+                  .select("code")
+                  .eq("id", fullSubCategory.main_category_id)
+                  .single();
+                
+                if (mainCatInOld?.code) {
+                  const { data: oldMainCat } = await supabase!
+                    .from("waste_main_categories")
+                    .select("id")
+                    .eq("code", mainCatInOld.code)
+                    .maybeSingle();
+                  
+                  if (oldMainCat) {
+                    mainCategoryIdForSub = Number(oldMainCat.id);
+                  }
+                }
+              }
+              
+              // إنشاء سجل جديد في waste_sub_categories
+              const { data: newSubCategory, error: insertSubError } = await supabase!
+                .from("waste_sub_categories")
+                .insert({
+                  code: unifiedSubCategory.code,
+                  name: fullSubCategory?.name_ar || fullSubCategory?.name || unifiedSubCategory.code,
+                  description: fullSubCategory?.description || null,
+                  main_category_id: mainCategoryIdForSub,
+                  is_active: true,
+                })
+                .select("id")
+                .single();
+              
+              if (newSubCategory && !insertSubError) {
+                subCategoryIdBigInt = Number(newSubCategory.id);
+                console.log(`✅ تم إنشاء الفئة الفرعية بنجاح: ${subCategoryIdBigInt}`);
+              } else {
+                console.error(`❌ فشل في إنشاء الفئة الفرعية:`, insertSubError);
+                subCategoryIdBigInt = null;
+              }
+            }
+          }
+          } else {
+            subCategoryIdBigInt = Number(waste.sub_category_id);
+          }
+        }
+      }
+
+      const wasteData: any = {
+        ...waste,
+      };
+
+      // إضافة bigint IDs فقط إذا تم تحديثها
+      if (mainCategoryIdBigInt !== undefined) {
+        wasteData.main_category_id = mainCategoryIdBigInt;
+      }
+      if (subCategoryIdBigInt !== undefined) {
+        wasteData.sub_category_id = subCategoryIdBigInt;
+      }
+
+      const { data, error } = await supabase!
+        .from("catalog_waste_materials")
+        .update(wasteData)
         .eq("id", id)
         .select()
         .single();
@@ -237,25 +597,197 @@ class WasteCatalogService {
   // جلب جميع المخلفات
   async getWasteMaterials(): Promise<WasteCatalogItem[]> {
     try {
-      const { data, error } = await supabase!
+      // الخطوة 1: جلب المخلفات من الكتالوج
+      const { data: catalogItems, error: catalogError } = await supabase!
         .from("catalog_waste_materials")
         .select(`
           *,
           warehouse:warehouses(name),
-          main_category:waste_main_categories(name),
-          sub_category:waste_sub_categories(name),
           unit:units(name),
           related_product:catalog_products(name, sku)
         `)
         .order("created_at", { ascending: false });
 
-      if (error) {
-        console.error("خطأ في جلب المخلفات:", error);
+      // جلب القطاعات من waste_sectors (sector_id هو Int يشير إلى waste_sectors)
+      const sectorIds = new Set<number>();
+      catalogItems?.forEach(item => {
+        if (item.sector_id) {
+          sectorIds.add(Number(item.sector_id));
+        }
+      });
+
+      let sectors: any[] = [];
+      if (sectorIds.size > 0) {
+        const { data: sectorsData, error: sectorsError } = await supabase!
+          .from("waste_sectors")
+          .select("id, name, code")
+          .in("id", Array.from(sectorIds));
+        
+        if (!sectorsError && sectorsData) {
+          sectors = sectorsData;
+          console.log(`✅ تم جلب ${sectors.length} قطاع من waste_sectors:`, sectors);
+        } else if (sectorsError) {
+          console.error(`❌ خطأ في جلب القطاعات:`, sectorsError);
+        }
+      } else {
+        console.log(`⚠️ لا توجد sector_ids في catalog_waste_materials`);
+      }
+
+      const sectorMap = new Map(sectors.map(s => [Number(s.id), s]));
+
+      if (catalogError) {
+        console.error("خطأ في جلب المخلفات:", catalogError);
         toast.error("حدث خطأ أثناء جلب المخلفات");
         return [];
       }
 
-      return data || [];
+      if (!catalogItems || catalogItems.length === 0) {
+        return [];
+      }
+
+      // الخطوة 2: جمع IDs الفئات القديمة
+      const mainCategoryIds = new Set<number>();
+      const subCategoryIds = new Set<number>();
+      catalogItems.forEach(item => {
+        if (item.main_category_id) mainCategoryIds.add(Number(item.main_category_id));
+        if (item.sub_category_id) subCategoryIds.add(Number(item.sub_category_id));
+      });
+
+      // الخطوة 3: جلب الفئات من الجداول القديمة
+      let oldMainCategories: any[] = [];
+      let oldSubCategories: any[] = [];
+      
+      if (mainCategoryIds.size > 0) {
+        const { data, error } = await supabase!
+          .from("waste_main_categories")
+          .select("id, code, name")
+          .in("id", Array.from(mainCategoryIds));
+        if (!error && data) {
+          oldMainCategories = data;
+        }
+      }
+
+      if (subCategoryIds.size > 0) {
+        const { data, error } = await supabase!
+          .from("waste_sub_categories")
+          .select("id, code, name")
+          .in("id", Array.from(subCategoryIds));
+        if (!error && data) {
+          oldSubCategories = data;
+        }
+      }
+
+      // إنشاء maps للبحث السريع
+      const oldMainCategoryMap = new Map(oldMainCategories.map(cat => [cat.id, cat]));
+      const oldSubCategoryMap = new Map(oldSubCategories.map(cat => [cat.id, cat]));
+
+      // الخطوة 4: جمع codes للبحث في الجداول الموحدة
+      const mainCategoryCodes = new Set<string>();
+      const subCategoryCodes = new Set<string>();
+      oldMainCategories.forEach(cat => { if (cat.code) mainCategoryCodes.add(cat.code); });
+      oldSubCategories.forEach(cat => { if (cat.code) subCategoryCodes.add(cat.code); });
+
+      // الخطوة 5: جلب الفئات الموحدة
+      let unifiedMainCategories: any[] = [];
+      let unifiedSubCategories: any[] = [];
+      
+      if (mainCategoryCodes.size > 0) {
+        const { data, error } = await supabase!
+          .from("unified_main_categories")
+          .select("id, code, name, name_ar")
+          .in("code", Array.from(mainCategoryCodes))
+          .eq("is_active", true);
+        if (!error && data) {
+          unifiedMainCategories = data;
+        }
+      }
+
+      if (subCategoryCodes.size > 0) {
+        const { data, error } = await supabase!
+          .from("unified_sub_categories")
+          .select("id, code, name, name_ar")
+          .in("code", Array.from(subCategoryCodes))
+          .eq("is_active", true);
+        if (!error && data) {
+          unifiedSubCategories = data;
+        }
+      }
+
+      // إنشاء maps للبحث السريع
+      const unifiedMainCategoryMap = new Map(unifiedMainCategories.map(cat => [cat.code, cat]));
+      const unifiedSubCategoryMap = new Map(unifiedSubCategories.map(cat => [cat.code, cat]));
+
+      // الخطوة 6: دمج البيانات
+      const enrichedItems = catalogItems.map(item => {
+        const oldMainCategory = item.main_category_id 
+          ? oldMainCategoryMap.get(Number(item.main_category_id))
+          : null;
+        const oldSubCategory = item.sub_category_id
+          ? oldSubCategoryMap.get(Number(item.sub_category_id))
+          : null;
+
+        const unifiedMainCategory = oldMainCategory?.code
+          ? unifiedMainCategoryMap.get(oldMainCategory.code)
+          : null;
+        const unifiedSubCategory = oldSubCategory?.code
+          ? unifiedSubCategoryMap.get(oldSubCategory.code)
+          : null;
+
+        // Debug logging
+        if (item.waste_no && !unifiedSubCategory && !oldSubCategory && item.sub_category_id) {
+          console.warn(`⚠️ لم يتم العثور على الفئة الفرعية للمخلف ${item.waste_no}:`, {
+            sub_category_id: item.sub_category_id,
+            oldSubCategory,
+            unifiedSubCategory,
+            oldSubCategories: oldSubCategories.length,
+            unifiedSubCategories: unifiedSubCategories.length
+          });
+        }
+
+        const sector = item.sector_id ? sectorMap.get(Number(item.sector_id)) : null;
+        
+        // Debug logging للقطاع
+        if (item.waste_no && item.sector_id && !sector) {
+          console.warn(`⚠️ لم يتم العثور على القطاع للمخلف ${item.waste_no}:`, {
+            sector_id: item.sector_id,
+            sectorMapSize: sectorMap.size,
+            sectors: sectors.length
+          });
+        }
+
+        // تحويل images من JSONB إلى array إذا لزم الأمر
+        let imagesArray: string[] = [];
+        if (item.images) {
+          if (Array.isArray(item.images)) {
+            imagesArray = item.images;
+          } else if (typeof item.images === 'string') {
+            try {
+              const parsed = JSON.parse(item.images);
+              imagesArray = Array.isArray(parsed) ? parsed : [];
+            } catch {
+              imagesArray = [];
+            }
+          }
+        }
+
+        return {
+          ...item,
+          main_category: unifiedMainCategory 
+            ? { name: unifiedMainCategory.name_ar || unifiedMainCategory.name, name_ar: unifiedMainCategory.name_ar }
+            : (oldMainCategory ? { name: oldMainCategory.name, name_ar: oldMainCategory.name } : null),
+          sub_category: unifiedSubCategory
+            ? { name: unifiedSubCategory.name_ar || unifiedSubCategory.name, name_ar: unifiedSubCategory.name_ar }
+            : (oldSubCategory ? { name: oldSubCategory.name, name_ar: oldSubCategory.name } : null),
+          sector: sector ? { 
+            id: sector.id, 
+            name: sector.name, 
+            name_ar: sector.name_ar || sector.name 
+          } : null,
+          images: imagesArray,
+        };
+      });
+
+      return enrichedItems;
     } catch (error) {
       console.error("خطأ في جلب المخلفات:", error);
       toast.error("حدث خطأ أثناء جلب المخلفات");
@@ -271,8 +803,8 @@ class WasteCatalogService {
         .select(`
           *,
           warehouse:warehouses(name),
-          main_category:waste_main_categories(name),
-          sub_category:waste_sub_categories(name),
+          main_category:unified_main_categories(name, name_ar),
+          sub_category:unified_sub_categories(name, name_ar),
           unit:units(name),
           related_product:catalog_products(name, sku)
         `)
@@ -318,38 +850,201 @@ class WasteCatalogService {
     }
   }
 
-  // جلب الفئات الأساسية للمخلفات
-  async getWasteMainCategories(): Promise<WasteMainCategory[]> {
+  // جلب الفئات الأساسية للمخلفات من الجداول الموحدة
+  async getWasteMainCategories(sectorId?: number | string): Promise<WasteMainCategory[]> {
     try {
-      const { data, error } = await supabase!
-        .from("waste_main_categories")
-        .select("*")
-        .order("name");
+      let query = supabase!
+        .from("unified_main_categories")
+        .select("id, code, name, name_ar, description, item_type, classification_id")
+        .in("item_type", ["waste", "both"])
+        .eq("is_active", true);
+
+      // إذا تم تحديد القطاع، فلترة الفئات حسب القطاع
+      if (sectorId) {
+        // جلب التصنيفات المرتبطة بهذا القطاع
+        // sectorId قد يكون UUID (string) أو number، نحتاج للتعامل معه بشكل صحيح
+        let sectorIdForQuery: string;
+        
+        if (typeof sectorId === 'string') {
+          // إذا كان UUID بالفعل
+          sectorIdForQuery = sectorId;
+        } else {
+          // إذا كان number، قد يكون من الجداول القديمة أو index في القائمة
+          // نحتاج للبحث عن UUID في warehouse_sectors
+          // أولاً، نحاول البحث باستخدام code إذا كان متاحاً
+          // أو نحتاج للحصول على القطاع من القائمة المحملة
+          
+          // محاولة البحث في waste_sectors أولاً (الجداول القديمة)
+          const { data: oldSector } = await supabase!
+            .from("waste_sectors")
+            .select("id, code")
+            .eq("id", sectorId)
+            .single();
+          
+          if (oldSector && oldSector.code) {
+            // البحث عن القطاع في warehouse_sectors باستخدام code
+            const { data: newSector } = await supabase!
+              .from("warehouse_sectors")
+              .select("id")
+              .eq("code", oldSector.code)
+              .eq("is_active", true)
+              .single();
+            
+            if (newSector) {
+              sectorIdForQuery = newSector.id;
+            } else {
+              console.warn(`⚠️ لم يتم العثور على القطاع بالكود: ${oldSector.code}`);
+              return [];
+            }
+          } else {
+            // إذا لم نجد في waste_sectors، قد يكون index في القائمة
+            // في هذه الحالة، نحتاج للحصول على القطاع من getWasteSectors
+            // لكن هذا يتطلب تحميل القطاعات أولاً
+            // بدلاً من ذلك، سنحاول البحث مباشرة في warehouse_sectors
+            // لكن هذا لن يعمل لأن id هو UUID
+            
+            // الحل الأفضل: البحث في جميع القطاعات النشطة
+            const { data: allSectors } = await supabase!
+              .from("warehouse_sectors")
+              .select("id, code")
+              .eq("is_active", true)
+              .order("name");
+            
+            if (allSectors && allSectors.length > 0) {
+              // استخدام index (sectorId - 1) للوصول للقطاع
+              const sectorIndex = Number(sectorId) - 1;
+              if (sectorIndex >= 0 && sectorIndex < allSectors.length) {
+                sectorIdForQuery = allSectors[sectorIndex].id;
+                console.log(`✅ تم العثور على القطاع باستخدام index: ${sectorIndex} -> ${sectorIdForQuery}`);
+              } else {
+                console.warn(`⚠️ index القطاع خارج النطاق: ${sectorIndex} من ${allSectors.length}`);
+                return [];
+              }
+            } else {
+              console.warn(`⚠️ لم يتم العثور على القطاع بالمعرف: ${sectorId}`);
+              return [];
+            }
+          }
+        }
+
+        console.log(`🔍 البحث عن التصنيفات للقطاع: ${sectorIdForQuery}`);
+        
+        const { data: classifications, error: classError } = await supabase!
+          .from("unified_classifications")
+          .select("id, name, name_ar, item_type")
+          .eq("sector_id", sectorIdForQuery)
+          .eq("is_active", true);
+
+        if (classError) {
+          console.error("❌ خطأ في جلب التصنيفات:", classError);
+          console.error("❌ تفاصيل الخطأ:", JSON.stringify(classError, null, 2));
+          return [];
+        }
+
+        console.log(`📋 التصنيفات الموجودة: ${classifications?.length || 0}`, classifications);
+
+        if (classifications && classifications.length > 0) {
+          // فلترة التصنيفات حسب item_type (waste أو both)
+          const wasteClassifications = classifications.filter(c => 
+            c.item_type === 'waste' || c.item_type === 'both'
+          );
+          
+          console.log(`📋 التصنيفات للمخلفات: ${wasteClassifications.length}`, wasteClassifications);
+
+          if (wasteClassifications.length > 0) {
+            const classificationIds = wasteClassifications.map(c => c.id);
+            query = query.in("classification_id", classificationIds);
+          } else {
+            console.warn(`⚠️ لا توجد تصنيفات للمخلفات في القطاع: ${sectorIdForQuery}`);
+            return [];
+          }
+        } else {
+          // إذا لم توجد تصنيفات لهذا القطاع، إرجاع قائمة فارغة
+          console.warn(`⚠️ لا توجد تصنيفات مرتبطة بالقطاع: ${sectorIdForQuery}`);
+          return [];
+        }
+      }
+
+      // جلب التصنيفات مع الفئات الأساسية لعرض معلومات التصنيف
+      const { data, error } = await query
+        .select(`
+          id, 
+          code, 
+          name, 
+          name_ar, 
+          description, 
+          item_type, 
+          classification_id,
+          classification:unified_classifications!unified_main_categories_classification_id_fkey(
+            id,
+            name,
+            name_ar
+          )
+        `)
+        .order("name_ar", { ascending: true, nullsFirst: false })
+        .order("name", { ascending: true });
 
       if (error) {
-        console.error("خطأ في جلب فئات المخلفات الأساسية:", error);
+        console.error("❌ خطأ في جلب فئات المخلفات الأساسية:", error);
+        console.error("❌ تفاصيل الخطأ:", JSON.stringify(error, null, 2));
         return [];
       }
 
-      return data || [];
+      console.log(`✅ تم جلب ${data?.length || 0} فئة مخلفات أساسية من unified_main_categories${sectorId ? ` للقطاع ${sectorId}` : ''}`);
+      if (data && data.length > 0) {
+        console.log('📋 الفئات:', data.map((c: any) => ({ 
+          id: c.id, 
+          name: c.name_ar || c.name, 
+          code: c.code,
+          classification: c.classification?.name_ar || c.classification?.name 
+        })));
+      } else {
+        console.warn(`⚠️ لم يتم العثور على فئات أساسية${sectorId ? ` للقطاع ${sectorId}` : ''}`);
+      }
+
+      // تحويل البيانات إلى الشكل المتوقع مع إضافة معلومات التصنيف
+      return (data || []).map((cat: any) => {
+        const classificationName = cat.classification?.name_ar || cat.classification?.name || '';
+        const categoryName = cat.name_ar || cat.name;
+        
+        // إضافة اسم التصنيف إلى اسم الفئة إذا كان متاحاً
+        const displayName = classificationName 
+          ? `${categoryName} (${classificationName})`
+          : categoryName;
+        
+        return {
+          id: cat.id, // يمكن أن يكون UUID أو number
+          code: cat.code,
+          name: displayName, // اسم الفئة مع التصنيف
+          description: cat.description,
+          classification_id: cat.classification_id,
+          classification_name: classificationName,
+        };
+      });
     } catch (error) {
-      console.error("خطأ في جلب فئات المخلفات الأساسية:", error);
+      console.error("❌ خطأ في جلب فئات المخلفات الأساسية:", error);
       return [];
     }
   }
 
-  // جلب الفئات الفرعية للمخلفات
+  // جلب الفئات الفرعية للمخلفات من الجداول الموحدة
   async getWasteSubCategories(
-    mainCategoryId?: number,
+    mainCategoryId?: number | string,
   ): Promise<WasteSubCategory[]> {
     try {
       let query = supabase!
-        .from("waste_sub_categories")
-        .select("*")
+        .from("unified_sub_categories")
+        .select("id, code, name, name_ar, main_category_id, item_type")
+        .in("item_type", ["waste", "both"])
+        .eq("is_active", true)
         .order("name");
 
       if (mainCategoryId) {
-        query = query.eq("main_id", mainCategoryId);
+        // mainCategoryId قد يكون UUID (string) أو number
+        const mainCategoryIdStr = mainCategoryId.toString();
+        
+        // استخدام mainCategoryId مباشرة (سواء كان UUID أو number)
+        query = query.eq("main_category_id", mainCategoryIdStr);
       }
 
       const { data, error } = await query;
@@ -359,72 +1054,70 @@ class WasteCatalogService {
         return [];
       }
 
-      return data || [];
+      // تحويل البيانات إلى الشكل المتوقع
+      // id قد يكون UUID (string) أو number
+      return (data || []).map(cat => {
+        // التحقق من نوع ID
+        let categoryId: string | number;
+        if (typeof cat.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cat.id)) {
+          // UUID
+          categoryId = cat.id;
+        } else {
+          // number
+          categoryId = parseInt(cat.id) || 0;
+        }
+
+        let mainCategoryId: string | number | null = null;
+        if (cat.main_category_id) {
+          if (typeof cat.main_category_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cat.main_category_id)) {
+            mainCategoryId = cat.main_category_id;
+          } else {
+            mainCategoryId = parseInt(cat.main_category_id) || 0;
+          }
+        }
+
+        return {
+          id: categoryId,
+          code: cat.code,
+          name: cat.name_ar || cat.name,
+          main_id: mainCategoryId,
+        };
+      });
     } catch (error) {
       console.error("خطأ في جلب فئات المخلفات الفرعية:", error);
       return [];
     }
   }
 
-  // إضافة فئة أساسية جديدة للمخلفات
+  // إضافة فئة أساسية جديدة للمخلفات - ملاحظة: يجب استخدام unifiedCategoriesService لإضافة فئات جديدة
+  // هذه الدالة محفوظة للتوافق الخلفي فقط
   async addWasteMainCategory(
     code: string,
     name: string,
   ): Promise<WasteMainCategory | null> {
     try {
-      const { data, error } = await supabase!
-        .from("waste_main_categories")
-        .insert([{ code, name }])
-        .select()
-        .single();
-
-      if (error) {
-        console.error("خطأ في إضافة فئة المخلفات الأساسية:", error);
-        toast.error(`حدث خطأ أثناء إضافة الفئة: ${error.message}`);
-        return null;
-      }
-
-      toast.success("تم إضافة فئة المخلفات الأساسية بنجاح");
-      return data;
+      toast.error('يرجى استخدام صفحة إدارة التنظيم والتسلسل لإضافة فئات جديدة');
+      console.warn('addWasteMainCategory deprecated - use unifiedCategoriesService instead');
+      return null;
     } catch (error) {
       console.error("خطأ في إضافة فئة المخلفات الأساسية:", error);
-      toast.error(
-        `حدث خطأ أثناء إضافة الفئة: ${
-          error instanceof Error ? error.message : "خطأ غير معروف"
-        }`,
-      );
       return null;
     }
   }
 
-  // إضافة فئة فرعية جديدة للمخلفات
+  // إضافة فئة فرعية جديدة للمخلفات - ملاحظة: يجب استخدام unifiedCategoriesService لإضافة فئات جديدة
+  // هذه الدالة محفوظة للتوافق الخلفي فقط
   async addWasteSubCategory(
     code: string,
     name: string,
     mainId: number,
   ): Promise<WasteSubCategory | null> {
     try {
-      const { data, error } = await supabase!
-        .from("waste_sub_categories")
-        .insert([{ code, name, main_id: mainId }])
-        .select()
-        .single();
-
-      if (error) {
-        console.error("خطأ في إضافة فئة المخلفات الفرعية:", error);
-        toast.error(`حدث خطأ أثناء إضافة الفئة الفرعية: ${error.message}`);
-        return null;
-      }
-
-      toast.success("تم إضافة فئة المخلفات الفرعية بنجاح");
-      return data;
+      toast.error('يرجى استخدام صفحة إدارة التنظيم والتسلسل لإضافة فئات جديدة');
+      console.warn('addWasteSubCategory deprecated - use unifiedCategoriesService instead');
+      return null;
     } catch (error) {
       console.error("خطأ في إضافة فئة المخلفات الفرعية:", error);
-      toast.error(
-        `حدث خطأ أثناء إضافة الفئة الفرعية: ${
-          error instanceof Error ? error.message : "خطأ غير معروف"
-        }`,
-      );
       return null;
     }
   }
@@ -633,7 +1326,7 @@ class WasteCatalogService {
 
       const { data, error } = await supabase!
         .from("units")
-        .select("id, name, symbol")
+        .select("id, name")
         .order("name");
 
       if (error) {
@@ -839,8 +1532,9 @@ class WasteCatalogService {
           return [];
         }
         
+        // إرجاع UUID كـ string للتوافق مع النظام الجديد
         return whData?.map(item => ({
-          id: -1, // معرف مؤقت لأن id الأصلي UUID
+          id: item.id, // استخدام UUID مباشرة
           name: item.name,
           description: item.description,
           code: item.code

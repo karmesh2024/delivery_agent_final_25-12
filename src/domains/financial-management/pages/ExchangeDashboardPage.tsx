@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store';
-import { fetchPrices, updateExchangeProduct } from '../store/exchangeSlice';
-import { fetchOrders } from '@/domains/industrial-partners/store/industrialPartnersSlice';
-import { StockExchange, exchangeService } from '../services/exchangeService';
-import { PartnerOrder } from '@/domains/industrial-partners/types';
+import { fetchPrices, updateExchangeProduct } from '@/domains/waste-management/store/exchangeSlice';
+import { fetchOrders } from '@/domains/waste-management/partners/store/industrialPartnersSlice';
+import { StockExchange, exchangeService } from '@/domains/waste-management/services/exchangeService';
+import { PartnerOrder } from '@/domains/waste-management/partners/types';
 import {
   Card,
   CardContent,
@@ -525,7 +525,7 @@ const ExchangeDashboardPage: React.FC = () => {
                      const { marginPercent } = calculateMargin(normalizedBuyPrice, sellPrice);
 
                      return (
-                       <TableRow key={item.id} className="hover:bg-blue-50/30 transition-colors border-b last:border-0 hover:shadow-sm">
+                       <TableRow key={item.product_id} className="hover:bg-blue-50/30 transition-colors border-b last:border-0 hover:shadow-sm">
                          <TableCell className="text-center text-gray-400 font-medium">{index + 1}</TableCell>
                          <TableCell className="font-semibold text-gray-800 text-base">
                             <div className="flex flex-col">
@@ -534,8 +534,11 @@ const ExchangeDashboardPage: React.FC = () => {
                                  <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold border border-blue-100">
                                    {item.catalog_item?.waste_no || 'بدون كود'}
                                  </span>
-                                 <span className="text-xs text-muted-foreground font-normal">
-                                   {(item.catalog_item?.main_category as any)?.name || item.category?.name || 'تصنيف عام'}
+                                 <span className="text-xs text-muted-foreground font-normal" title={(item.catalog_item?.main_category as any)?.full_path || (item.catalog_item?.main_category as any)?.name || 'تصنيف عام'}>
+                                   {(item.catalog_item?.main_category as any)?.full_path || 
+                                    (item.catalog_item?.main_category as any)?.name || 
+                                    item.category?.name || 
+                                    'تصنيف عام'}
                                  </span>
                                </div>
                             </div>

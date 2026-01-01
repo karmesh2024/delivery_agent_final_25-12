@@ -4,7 +4,7 @@ import React from 'react';
 import { DashboardLayout } from '@/shared/layouts/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
-import { FiPackage, FiTruck, FiRefreshCw, FiList, FiBarChart2, FiLayers } from "react-icons/fi";
+import { FiPackage, FiTruck, FiRefreshCw, FiList, FiBarChart2, FiLayers, FiTag } from "react-icons/fi";
 import Link from "next/link";
 
 export default function WarehouseManagement() {
@@ -129,7 +129,7 @@ export default function WarehouseManagement() {
               <p className="mb-4">
                 تسجيل وتتبع عمليات الاستلام والصرف والتحويلات بين المخازن.
               </p>
-              <Link href="/warehouse-management/transactions">
+              <Link href="/warehouse-management/movements">
                 <Button className="w-full">
                   إدارة حركة المخزون
                 </Button>
@@ -207,6 +207,30 @@ export default function WarehouseManagement() {
                 <Button variant="outline" className="w-full">النظام القديم</Button>
               </Link>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* بطاقة إدارة التنظيم والتسلسل */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center text-xl">
+              <FiTag className="mr-2 text-cyan-500" />
+              إدارة التنظيم والتسلسل
+            </CardTitle>
+            <CardDescription>
+              نظام موحد لإدارة القطاعات، التصنيفات، الفئات والبراندز
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4">
+              إدارة موحدة للقطاعات، التصنيفات، الفئات الأساسية والفرعية، الوحدات والبراندز في نظام متكامل.
+            </p>
+            <Link href="/warehouse-management/organization-structure">
+              <Button className="w-full bg-cyan-600 hover:bg-cyan-700">
+                <FiTag className="mr-2" />
+                فتح إدارة التنظيم والتسلسل
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 

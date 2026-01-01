@@ -19,11 +19,11 @@ import storesReducer from "@/domains/stores/store/storeSlice";
 import alertReducer from "@/domains/financial-management/store/alertSlice";
 import productReducer from "@/domains/products/store/productSlice";
 import productCategoriesReducer from "@/domains/product-categories/store/productCategoriesSlice";
-import exchangeReducer from "@/domains/financial-management/store/exchangeSlice";
+import exchangeReducer from "@/domains/waste-management/store/exchangeSlice";
 import approvedAgentsReducer from "@/domains/approved-agents/store/approvedAgentsSlice";
 import storeOrdersReducer from "@/domains/store-orders/store/storeOrdersSlice";
 import purchasingReducer from "@/domains/purchasing/store/purchasingSlice";
-import industrialPartnersReducer from "../domains/industrial-partners/store/industrialPartnersSlice";
+import industrialPartnersReducer from "../domains/waste-management/partners/store/industrialPartnersSlice";
 
 export const store = configureStore({
   reducer: {

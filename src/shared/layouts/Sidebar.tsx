@@ -29,7 +29,8 @@ import {
   FiShoppingBag,
   FiShoppingCart,
   FiBriefcase,
-  FiClipboard
+  FiClipboard,
+  FiCheckCircle
 } from "react-icons/fi";
 
 // مكون للتأكد من أن المحتوى يظهر فقط بعد اكتمال الهيدريشن
@@ -68,15 +69,13 @@ export function Sidebar() {
     { name: "الإدارة المالية", href: "/financial-management", icon: FiDollarSign },
     { name: "إدارة المخازن", href: "/warehouse-management", icon: FiPackage },
     { name: "إدارة الموردين", href: "/supplier-management", icon: FiShoppingBag },
-    { name: "إدارة الشركاء الصناعيين", href: "/industrial-partners", icon: FiBriefcase },
+    { name: "إدارة المخلفات", href: "/waste-management", icon: FiPackage },
     { name: "إدارة المتاجر الالكترونية", href: "/store-management", icon: FiShoppingCart },
     { name: "الوكلاء المعتمدون", href: "/approved-agents", icon: FiUsers },
     { name: "Delivery Agents", href: "/agents", icon: FiTruck },
     { name: "Trips", href: "/trips", icon: FiTruck },
-    { name: "إدارة الفئات والمنتجات", href: "/product-categories", icon: FiLayers },
     { name: "Map View", href: "/map-view", icon: FiMap },
     { name: "Analytics", href: "/analytics", icon: FiBarChart2 },
-    { name: "البورصة", href: "/financial-management/exchange", icon: FiDollarSign },
     { name: "Messages", href: "/messages", icon: FiMessageSquare },
     { name: "Support", href: "/support", icon: FiHelpCircle },
     { name: "الإعدادات", href: "/settings", icon: FiSettings },

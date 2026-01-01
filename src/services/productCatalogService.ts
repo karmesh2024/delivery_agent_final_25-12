@@ -50,16 +50,16 @@ export interface ProductCatalogItem {
 }
 
 export interface ProductMainCategory {
-  id: number;
+  id: number | string; // يمكن أن يكون UUID أو number
   code: string;
   name: string;
 }
 
 export interface ProductSubCategory {
-  id: number;
+  id: number | string; // يمكن أن يكون UUID أو number
   code: string;
   name: string;
-  main_id: number;
+  main_id: number | string; // يمكن أن يكون UUID أو number
 }
 
 export interface Unit {
@@ -72,9 +72,77 @@ class ProductCatalogService {
   // إضافة منتج جديد
   async addProduct(product: Omit<ProductCatalogItem, 'id' | 'created_at'>): Promise<ProductCatalogItem | null> {
     try {
+      // تحويل UUID من unified_main_categories إلى bigint من product_main_categories
+      let mainCategoryIdBigInt: number | null = null;
+      let subCategoryIdBigInt: number | null = null;
+
+      if (product.main_category_id) {
+        const mainCategoryIdStr = product.main_category_id.toString();
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(mainCategoryIdStr);
+        
+        if (isUUID) {
+          // البحث عن code في unified_main_categories
+          const { data: unifiedMainCategory } = await supabase
+            .from('unified_main_categories')
+            .select('code')
+            .eq('id', mainCategoryIdStr)
+            .single();
+          
+          if (unifiedMainCategory?.code) {
+            // البحث عن bigint في product_main_categories
+            const { data: oldMainCategory } = await supabase
+              .from('product_main_categories')
+              .select('id')
+              .eq('code', unifiedMainCategory.code)
+              .single();
+            
+            if (oldMainCategory) {
+              mainCategoryIdBigInt = Number(oldMainCategory.id);
+            }
+          }
+        } else {
+          mainCategoryIdBigInt = Number(product.main_category_id);
+        }
+      }
+
+      if (product.sub_category_id) {
+        const subCategoryIdStr = product.sub_category_id.toString();
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subCategoryIdStr);
+        
+        if (isUUID) {
+          // البحث عن code في unified_sub_categories
+          const { data: unifiedSubCategory } = await supabase
+            .from('unified_sub_categories')
+            .select('code')
+            .eq('id', subCategoryIdStr)
+            .single();
+          
+          if (unifiedSubCategory?.code) {
+            // البحث عن bigint في product_sub_categories
+            const { data: oldSubCategory } = await supabase
+              .from('product_sub_categories')
+              .select('id')
+              .eq('code', unifiedSubCategory.code)
+              .single();
+            
+            if (oldSubCategory) {
+              subCategoryIdBigInt = Number(oldSubCategory.id);
+            }
+          }
+        } else {
+          subCategoryIdBigInt = Number(product.sub_category_id);
+        }
+      }
+
+      const productData = {
+        ...product,
+        main_category_id: mainCategoryIdBigInt,
+        sub_category_id: subCategoryIdBigInt,
+      };
+
       const { data, error } = await supabase
         .from('catalog_products')
-        .insert([product])
+        .insert([productData])
         .select()
         .single();
 
@@ -96,9 +164,91 @@ class ProductCatalogService {
   // تحديث منتج موجود
   async updateProduct(id: number, product: Partial<ProductCatalogItem>): Promise<ProductCatalogItem | null> {
     try {
+      // تحويل UUID من unified_main_categories إلى bigint من product_main_categories
+      let mainCategoryIdBigInt: number | null | undefined = undefined;
+      let subCategoryIdBigInt: number | null | undefined = undefined;
+
+      if (product.main_category_id !== undefined) {
+        if (product.main_category_id === null) {
+          mainCategoryIdBigInt = null;
+        } else {
+          const mainCategoryIdStr = product.main_category_id.toString();
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(mainCategoryIdStr);
+          
+          if (isUUID) {
+            // البحث عن code في unified_main_categories
+            const { data: unifiedMainCategory } = await supabase
+              .from('unified_main_categories')
+              .select('code')
+              .eq('id', mainCategoryIdStr)
+              .single();
+            
+            if (unifiedMainCategory?.code) {
+              // البحث عن bigint في product_main_categories
+              const { data: oldMainCategory } = await supabase
+                .from('product_main_categories')
+                .select('id')
+                .eq('code', unifiedMainCategory.code)
+                .single();
+              
+              if (oldMainCategory) {
+                mainCategoryIdBigInt = Number(oldMainCategory.id);
+              }
+            }
+          } else {
+            mainCategoryIdBigInt = Number(product.main_category_id);
+          }
+        }
+      }
+
+      if (product.sub_category_id !== undefined) {
+        if (product.sub_category_id === null) {
+          subCategoryIdBigInt = null;
+        } else {
+          const subCategoryIdStr = product.sub_category_id.toString();
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subCategoryIdStr);
+          
+          if (isUUID) {
+            // البحث عن code في unified_sub_categories
+            const { data: unifiedSubCategory } = await supabase
+              .from('unified_sub_categories')
+              .select('code')
+              .eq('id', subCategoryIdStr)
+              .single();
+            
+            if (unifiedSubCategory?.code) {
+              // البحث عن bigint في product_sub_categories
+              const { data: oldSubCategory } = await supabase
+                .from('product_sub_categories')
+                .select('id')
+                .eq('code', unifiedSubCategory.code)
+                .single();
+              
+              if (oldSubCategory) {
+                subCategoryIdBigInt = Number(oldSubCategory.id);
+              }
+            }
+          } else {
+            subCategoryIdBigInt = Number(product.sub_category_id);
+          }
+        }
+      }
+
+      const productData: any = {
+        ...product,
+      };
+
+      // إضافة bigint IDs فقط إذا تم تحديثها
+      if (mainCategoryIdBigInt !== undefined) {
+        productData.main_category_id = mainCategoryIdBigInt;
+      }
+      if (subCategoryIdBigInt !== undefined) {
+        productData.sub_category_id = subCategoryIdBigInt;
+      }
+
       const { data, error } = await supabase
         .from('catalog_products')
-        .update(product)
+        .update(productData)
         .eq('id', id)
         .select()
         .single();
@@ -121,24 +271,126 @@ class ProductCatalogService {
   // جلب جميع المنتجات
   async getProducts(): Promise<ProductCatalogItem[]> {
     try {
-      const { data, error } = await supabase
+      // الخطوة 1: جلب المنتجات من الكتالوج
+      const { data: catalogItems, error: catalogError } = await supabase
         .from('catalog_products')
         .select(`
           *,
           warehouse:warehouses(name),
-          main_category:product_main_categories(name),
-          sub_category:product_sub_categories(name),
           unit:units(name)
         `)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('خطأ في جلب المنتجات:', error);
+      if (catalogError) {
+        console.error('خطأ في جلب المنتجات:', catalogError);
         toast.error('حدث خطأ أثناء جلب المنتجات');
         return [];
       }
 
-      return data || [];
+      if (!catalogItems || catalogItems.length === 0) {
+        return [];
+      }
+
+      // الخطوة 2: جمع IDs الفئات القديمة
+      const mainCategoryIds = new Set<number>();
+      const subCategoryIds = new Set<number>();
+      catalogItems.forEach(item => {
+        if (item.main_category_id) mainCategoryIds.add(Number(item.main_category_id));
+        if (item.sub_category_id) subCategoryIds.add(Number(item.sub_category_id));
+      });
+
+      // الخطوة 3: جلب الفئات من الجداول القديمة
+      let oldMainCategories: any[] = [];
+      let oldSubCategories: any[] = [];
+      
+      if (mainCategoryIds.size > 0) {
+        const { data, error } = await supabase
+          .from("product_main_categories")
+          .select("id, code, name")
+          .in("id", Array.from(mainCategoryIds));
+        if (!error && data) {
+          oldMainCategories = data;
+        }
+      }
+
+      if (subCategoryIds.size > 0) {
+        const { data, error } = await supabase
+          .from("product_sub_categories")
+          .select("id, code, name")
+          .in("id", Array.from(subCategoryIds));
+        if (!error && data) {
+          oldSubCategories = data;
+        }
+      }
+
+      // إنشاء maps للبحث السريع
+      const oldMainCategoryMap = new Map(oldMainCategories.map(cat => [cat.id, cat]));
+      const oldSubCategoryMap = new Map(oldSubCategories.map(cat => [cat.id, cat]));
+
+      // الخطوة 4: جمع codes للبحث في الجداول الموحدة
+      const mainCategoryCodes = new Set<string>();
+      const subCategoryCodes = new Set<string>();
+      oldMainCategories.forEach(cat => { if (cat.code) mainCategoryCodes.add(cat.code); });
+      oldSubCategories.forEach(cat => { if (cat.code) subCategoryCodes.add(cat.code); });
+
+      // الخطوة 5: جلب الفئات الموحدة
+      let unifiedMainCategories: any[] = [];
+      let unifiedSubCategories: any[] = [];
+      
+      if (mainCategoryCodes.size > 0) {
+        const { data, error } = await supabase
+          .from("unified_main_categories")
+          .select("id, code, name, name_ar")
+          .in("code", Array.from(mainCategoryCodes))
+          .eq("is_active", true);
+        if (!error && data) {
+          unifiedMainCategories = data;
+        }
+      }
+
+      if (subCategoryCodes.size > 0) {
+        const { data, error } = await supabase
+          .from("unified_sub_categories")
+          .select("id, code, name, name_ar")
+          .in("code", Array.from(subCategoryCodes))
+          .eq("is_active", true);
+        if (!error && data) {
+          unifiedSubCategories = data;
+        }
+      }
+
+      // إنشاء maps للبحث السريع
+      const unifiedMainCategoryMap = new Map(unifiedMainCategories.map(cat => [cat.code, cat]));
+      const unifiedSubCategoryMap = new Map(unifiedSubCategories.map(cat => [cat.code, cat]));
+
+      // الخطوة 6: دمج البيانات
+      const enrichedItems = catalogItems.map(item => {
+        const oldMainCategory = item.main_category_id 
+          ? oldMainCategoryMap.get(Number(item.main_category_id))
+          : null;
+        const oldSubCategory = item.sub_category_id
+          ? oldSubCategoryMap.get(Number(item.sub_category_id))
+          : null;
+
+        const unifiedMainCategory = oldMainCategory?.code
+          ? unifiedMainCategoryMap.get(oldMainCategory.code)
+          : null;
+        const unifiedSubCategory = oldSubCategory?.code
+          ? unifiedSubCategoryMap.get(oldSubCategory.code)
+          : null;
+
+        return {
+          ...item,
+          main_category: unifiedMainCategory 
+            ? { name: unifiedMainCategory.name, name_ar: unifiedMainCategory.name_ar }
+            : (oldMainCategory ? { name: oldMainCategory.name, name_ar: oldMainCategory.name } : null),
+          sub_category: unifiedSubCategory
+            ? { name: unifiedSubCategory.name, name_ar: unifiedSubCategory.name_ar }
+            : (oldSubCategory ? { name: oldSubCategory.name, name_ar: oldSubCategory.name } : null),
+        };
+      });
+
+      return enrichedItems;
     } catch (error: any) {
       console.error('خطأ في جلب المنتجات:', error);
       toast.error('حدث خطأ أثناء جلب المنتجات');
@@ -154,8 +406,8 @@ class ProductCatalogService {
         .select(`
           *,
           warehouse:warehouses(name),
-          main_category:product_main_categories(name),
-          sub_category:product_sub_categories(name),
+          main_category:unified_main_categories(name, name_ar),
+          sub_category:unified_sub_categories(name, name_ar),
           unit:units(name)
         `)
         .eq('id', id)
@@ -196,36 +448,62 @@ class ProductCatalogService {
     }
   }
 
-  // جلب الفئات الأساسية
+  // جلب الفئات الأساسية من الجداول الموحدة
   async getMainCategories(): Promise<ProductMainCategory[]> {
     try {
+      console.log('🔍 جلب الفئات الأساسية من unified_main_categories...');
       const { data, error } = await supabase
-        .from('product_main_categories')
-        .select('*')
-        .order('name');
+        .from('unified_main_categories')
+        .select('id, code, name, name_ar, item_type')
+        .in('item_type', ['product', 'both'])
+        .eq('is_active', true)
+        .order('name_ar', { ascending: true, nullsFirst: false })
+        .order('name', { ascending: true });
 
       if (error) {
-        console.error('خطأ في جلب الفئات الأساسية:', error);
+        console.error('❌ خطأ في جلب الفئات الأساسية:', error);
         return [];
       }
 
-      return data || [];
+      console.log(`✅ تم جلب ${data?.length || 0} فئة أساسية من unified_main_categories`);
+      console.log('📋 الفئات:', data);
+
+      // تحويل البيانات إلى الشكل المتوقع
+      return (data || []).map(cat => ({
+        id: cat.id, // استخدام UUID مباشرة
+        code: cat.code,
+        name: cat.name_ar || cat.name,
+      }));
     } catch (error: any) {
-      console.error('خطأ في جلب الفئات الأساسية:', error);
+      console.error('❌ خطأ في جلب الفئات الأساسية:', error);
       return [];
     }
   }
 
-  // جلب الفئات الفرعية
+  // جلب الفئات الفرعية من الجداول الموحدة
   async getSubCategories(mainCategoryId?: number): Promise<ProductSubCategory[]> {
     try {
       let query = supabase
-        .from('product_sub_categories')
-        .select('*')
+        .from('unified_sub_categories')
+        .select('id, code, name, name_ar, main_category_id, item_type')
+        .in('item_type', ['product', 'both'])
+        .eq('is_active', true)
         .order('name');
 
       if (mainCategoryId) {
-        query = query.eq('main_id', mainCategoryId);
+        // البحث عن main_category_id في unified_main_categories أولاً
+        const { data: mainCategory } = await supabase
+          .from('unified_main_categories')
+          .select('id')
+          .eq('id', mainCategoryId.toString())
+          .single();
+        
+        if (mainCategory) {
+          query = query.eq('main_category_id', mainCategory.id);
+        } else {
+          // محاولة البحث باستخدام mainCategoryId مباشرة
+          query = query.eq('main_category_id', mainCategoryId.toString());
+        }
       }
 
       const { data, error } = await query;
@@ -235,7 +513,13 @@ class ProductCatalogService {
         return [];
       }
 
-      return data || [];
+      // تحويل البيانات إلى الشكل المتوقع
+      return (data || []).map(cat => ({
+        id: cat.id, // استخدام UUID مباشرة
+        code: cat.code,
+        name: cat.name_ar || cat.name,
+        main_id: cat.main_category_id, // استخدام UUID مباشرة
+      }));
     } catch (error: any) {
       console.error('خطأ في جلب الفئات الفرعية:', error);
       return [];
@@ -262,62 +546,41 @@ class ProductCatalogService {
     }
   }
 
-  // إضافة فئة أساسية جديدة
+  // إضافة فئة أساسية جديدة - ملاحظة: يجب استخدام unifiedCategoriesService لإضافة فئات جديدة
+  // هذه الدالة محفوظة للتوافق الخلفي فقط
   async addMainCategory(code: string, name: string): Promise<ProductMainCategory | null> {
     try {
-      const { data, error } = await supabase
-        .from('product_main_categories')
-        .insert([{ code, name }])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('خطأ في إضافة الفئة الأساسية:', error);
-        toast.error(`حدث خطأ أثناء إضافة الفئة: ${error.message}`);
-        return null;
-      }
-
-      toast.success('تم إضافة الفئة الأساسية بنجاح');
-      return data;
+      toast.error('يرجى استخدام صفحة إدارة التنظيم والتسلسل لإضافة فئات جديدة');
+      console.warn('addMainCategory deprecated - use unifiedCategoriesService instead');
+      return null;
     } catch (error: any) {
       console.error('خطأ في إضافة الفئة الأساسية:', error);
-      toast.error(`حدث خطأ أثناء إضافة الفئة: ${error.message}`);
       return null;
     }
   }
 
-  // إضافة فئة فرعية جديدة
+  // إضافة فئة فرعية جديدة - ملاحظة: يجب استخدام unifiedCategoriesService لإضافة فئات جديدة
+  // هذه الدالة محفوظة للتوافق الخلفي فقط
   async addSubCategory(code: string, name: string, mainId: number): Promise<ProductSubCategory | null> {
     try {
-      const { data, error } = await supabase
-        .from('product_sub_categories')
-        .insert([{ code, name, main_id: mainId }])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('خطأ في إضافة الفئة الفرعية:', error);
-        toast.error(`حدث خطأ أثناء إضافة الفئة الفرعية: ${error.message}`);
-        return null;
-      }
-
-      toast.success('تم إضافة الفئة الفرعية بنجاح');
-      return data;
+      toast.error('يرجى استخدام صفحة إدارة التنظيم والتسلسل لإضافة فئات جديدة');
+      console.warn('addSubCategory deprecated - use unifiedCategoriesService instead');
+      return null;
     } catch (error: any) {
       console.error('خطأ في إضافة الفئة الفرعية:', error);
-      toast.error(`حدث خطأ أثناء إضافة الفئة الفرعية: ${error.message}`);
       return null;
     }
   }
 
-  // تحديث فئة أساسية
-  async updateMainCategory(id: number, code: string, name: string): Promise<ProductMainCategory | null> {
+  // تحديث فئة أساسية - ملاحظة: يجب استخدام unifiedCategoriesService لتحديث فئات
+  // هذه الدالة محفوظة للتوافق الخلفي فقط
+  async updateMainCategory(id: number | string, code: string, name: string): Promise<ProductMainCategory | null> {
     try {
       const { data, error } = await supabase
-        .from('product_main_categories')
-        .update({ code, name })
-        .eq('id', id)
-        .select()
+        .from('unified_main_categories')
+        .update({ code, name, name_ar: name })
+        .eq('id', id.toString())
+        .select('id, code, name, name_ar')
         .single();
 
       if (error) {
@@ -327,7 +590,11 @@ class ProductCatalogService {
       }
 
       toast.success('تم تحديث الفئة الأساسية بنجاح');
-      return data;
+      return {
+        id: data.id,
+        code: data.code,
+        name: data.name_ar || data.name,
+      };
     } catch (error: any) {
       console.error('خطأ في تحديث الفئة الأساسية:', error);
       toast.error(`حدث خطأ أثناء تحديث الفئة: ${error.message}`);
@@ -335,13 +602,13 @@ class ProductCatalogService {
     }
   }
 
-  // حذف فئة أساسية
-  async deleteMainCategory(id: number): Promise<boolean> {
+  // حذف فئة أساسية - ملاحظة: يجب استخدام unifiedCategoriesService لحذف فئات
+  async deleteMainCategory(id: number | string): Promise<boolean> {
     try {
       const { error } = await supabase
-        .from('product_main_categories')
-        .delete()
-        .eq('id', id);
+        .from('unified_main_categories')
+        .update({ is_active: false })
+        .eq('id', id.toString());
 
       if (error) {
         console.error('خطأ في حذف الفئة الأساسية:', error);
@@ -358,14 +625,14 @@ class ProductCatalogService {
     }
   }
 
-  // تحديث فئة فرعية
-  async updateSubCategory(id: number, code: string, name: string, mainId: number): Promise<ProductSubCategory | null> {
+  // تحديث فئة فرعية - ملاحظة: يجب استخدام unifiedCategoriesService لتحديث فئات
+  async updateSubCategory(id: number | string, code: string, name: string, mainId: number | string): Promise<ProductSubCategory | null> {
     try {
       const { data, error } = await supabase
-        .from('product_sub_categories')
-        .update({ code, name, main_id: mainId })
-        .eq('id', id)
-        .select()
+        .from('unified_sub_categories')
+        .update({ code, name, name_ar: name, main_category_id: mainId.toString() })
+        .eq('id', id.toString())
+        .select('id, code, name, name_ar, main_category_id')
         .single();
 
       if (error) {
@@ -375,7 +642,12 @@ class ProductCatalogService {
       }
 
       toast.success('تم تحديث الفئة الفرعية بنجاح');
-      return data;
+      return {
+        id: data.id,
+        code: data.code,
+        name: data.name_ar || data.name,
+        main_id: data.main_category_id,
+      };
     } catch (error: any) {
       console.error('خطأ في تحديث الفئة الفرعية:', error);
       toast.error(`حدث خطأ أثناء تحديث الفئة الفرعية: ${error.message}`);
@@ -383,13 +655,13 @@ class ProductCatalogService {
     }
   }
 
-  // حذف فئة فرعية
-  async deleteSubCategory(id: number): Promise<boolean> {
+  // حذف فئة فرعية - ملاحظة: يجب استخدام unifiedCategoriesService لحذف فئات
+  async deleteSubCategory(id: number | string): Promise<boolean> {
     try {
       const { error } = await supabase
-        .from('product_sub_categories')
-        .delete()
-        .eq('id', id);
+        .from('unified_sub_categories')
+        .update({ is_active: false })
+        .eq('id', id.toString());
 
       if (error) {
         console.error('خطأ في حذف الفئة الفرعية:', error);

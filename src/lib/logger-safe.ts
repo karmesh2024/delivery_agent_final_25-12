@@ -405,19 +405,38 @@ export const cleanForLog = (data: unknown): unknown => {
 };
 
 // 🎛️ دوال مساعدة للتكامل مع Redux
-export const getCurrentUserId = (): string | null => {
-  if (typeof window !== "undefined") {
-    try {
-      const state = localStorage.getItem("persist:app");
-      if (state) {
-        const parsed = JSON.parse(state);
-        const auth = JSON.parse(parsed.auth || "{}");
-        return auth.user?.id || auth.userId || null;
-      }
-    } catch {
-      // تجاهل أخطاء التحليل
-    }
+export const getCurrentUserId = async (): Promise<string | null> => {
+  if (typeof window === "undefined") {
+    return null;
   }
+
+  try {
+    // محاولة الحصول من Redux store أولاً
+    const state = localStorage.getItem("persist:app");
+    if (state) {
+      const parsed = JSON.parse(state);
+      const auth = JSON.parse(parsed.auth || "{}");
+      if (auth.user?.id || auth.userId) {
+        return auth.user?.id || auth.userId;
+      }
+    }
+  } catch {
+    // تجاهل أخطاء التحليل
+  }
+
+  // محاولة الحصول من Supabase مباشرة
+  try {
+    const { supabase } = await import('./supabase');
+    if (supabase) {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (!error && user) {
+        return user.id;
+      }
+    }
+  } catch (error) {
+    console.warn('Error getting user from Supabase:', error);
+  }
+
   return null;
 };
 

@@ -49,6 +49,56 @@ export default function CatalogViewPage() {
     loadCategories();
   }, []);
 
+  // الاستماع لتحديثات البيانات من صفحات أخرى
+  useEffect(() => {
+    // الاستماع لتحديثات من نفس النافذة
+    const handleCustomEvent = () => {
+      console.log('🔄 تحديث قائمة المخلفات بعد إضافة جديدة...');
+      loadWasteMaterials();
+      loadProducts();
+    };
+    
+    window.addEventListener('wasteCatalogUpdated', handleCustomEvent);
+    window.addEventListener('productCatalogUpdated', handleCustomEvent);
+
+    // إعادة تحميل البيانات عند التركيز على النافذة (عند العودة من صفحة أخرى)
+    const handleFocus = () => {
+      const lastUpdate = localStorage.getItem('wasteCatalogLastUpdate');
+      if (lastUpdate) {
+        const timeSinceUpdate = Date.now() - parseInt(lastUpdate, 10);
+        // إعادة التحميل إذا مر أقل من 30 ثانية (يعني تمت إضافة جديدة)
+        if (timeSinceUpdate < 30000) {
+          console.log('🔄 إعادة تحميل البيانات بعد العودة من صفحة الإضافة...');
+          loadWasteMaterials();
+          loadProducts();
+        }
+      }
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    
+    // فحص دوري للتحديثات (كل 5 ثوان)
+    const intervalId = setInterval(() => {
+      const lastUpdate = localStorage.getItem('wasteCatalogLastUpdate');
+      if (lastUpdate) {
+        const timeSinceUpdate = Date.now() - parseInt(lastUpdate, 10);
+        if (timeSinceUpdate < 10000) { // أقل من 10 ثوان
+          console.log('🔄 تحديث تلقائي للبيانات...');
+          loadWasteMaterials();
+          loadProducts();
+          localStorage.removeItem('wasteCatalogLastUpdate'); // إزالة العلامة بعد التحديث
+        }
+      }
+    }, 5000);
+
+    return () => {
+      window.removeEventListener('wasteCatalogUpdated', handleCustomEvent);
+      window.removeEventListener('productCatalogUpdated', handleCustomEvent);
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(intervalId);
+    };
+  }, []);
+
   const loadCategories = async () => {
     try {
       const data = await wasteCatalogService.getWasteMainCategories();
@@ -711,9 +761,31 @@ export default function CatalogViewPage() {
           {selectedWaste && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
               <div className="space-y-4">
-                <div className="aspect-square relative bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
-                   <div className="text-gray-400">لا يوجد صور حالياً</div>
-                </div>
+                {selectedWaste.images && Array.isArray(selectedWaste.images) && selectedWaste.images.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {selectedWaste.images.map((image, index) => {
+                      const imageUrl = typeof image === 'string' ? image : (image instanceof File ? URL.createObjectURL(image) : '');
+                      if (!imageUrl) return null;
+                      return (
+                        <div key={index} className="aspect-square relative bg-gray-100 rounded-lg overflow-hidden">
+                          <img 
+                            src={imageUrl} 
+                            alt={`صورة ${index + 1}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              console.error('خطأ في تحميل الصورة:', imageUrl);
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="aspect-square relative bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+                    <div className="text-gray-400">لا يوجد صور حالياً</div>
+                  </div>
+                )}
                 {selectedWaste.qr_code && (
                   <div className="p-4 border rounded-lg flex flex-col items-center">
                     <p className="text-sm text-gray-500 mb-2">QR Code</p>
@@ -741,7 +813,11 @@ export default function CatalogViewPage() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">الفئة الفرعية</p>
-                    <p className="font-semibold">{selectedWaste.sub_category?.name || 'غير محدد'}</p>
+                    <p className="font-semibold">{selectedWaste.sub_category?.name_ar || selectedWaste.sub_category?.name || 'غير محدد'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">القطاع</p>
+                    <p className="font-semibold">{selectedWaste.sector?.name_ar || selectedWaste.sector?.name || 'غير محدد'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">الحالة</p>

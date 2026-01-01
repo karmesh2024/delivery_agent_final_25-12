@@ -23,17 +23,22 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchInventoryItems } from '@/store/inventory/inventorySlice';
 import { RootState } from '@/store/store';
 import warehouseService from '@/domains/warehouse-management/services/warehouseService';
+import inventoryService from '@/domains/warehouse-management/services/inventoryService';
+import { supabase } from '@/lib/supabase';
 
 interface InventoryItem {
-  id: string;
-  product: { name: string };
-  category: { name: string };
-  warehouse: { name: string };
+  id: number | string;
+  product_id?: string | null;
+  catalog_waste_id?: number | null;
+  product?: { name: string };
+  category?: { name: string };
+  item_type?: 'product' | 'waste' | 'unknown'; // نوع المادة
+  warehouse: { id: number; name: string };
   quantity: number;
-  unit: string;
-  min_quantity: number;
-  max_quantity: number;
-  last_update: string;
+  unit: string | null;
+  min_quantity: number | null;
+  max_quantity: number | null;
+  last_update: string | null;
 }
 
 const InventoryManagementPage: React.FC = () => {
@@ -49,6 +54,7 @@ const InventoryManagementPage: React.FC = () => {
   const [warehouseList, setWarehouseList] = useState<{ id: number; name: string; warehouse_type?: 'products' | 'waste' | 'mixed' }[]>([]);
   const [warehouseDropdownOpen, setWarehouseDropdownOpen] = useState(false);
   const [warehouseSearch, setWarehouseSearch] = useState('');
+  const [categoryList, setCategoryList] = useState<string[]>([]);
   const router = useRouter();
 
   // Modal state for creating supply order (add material/product)
@@ -66,72 +72,296 @@ const InventoryManagementPage: React.FC = () => {
   const [adjustReason, setAdjustReason] = useState('');
   
   useEffect(() => {
-    // في الإصدار النهائي
-    // dispatch(fetchInventoryItems());
-    
-    // البيانات المؤقتة للعرض
-    const dummyData: InventoryItem[] = [
-      { 
-        id: '1', 
-        product: { name: 'الألومنيوم المعاد تدويره' }, 
-        category: { name: 'معادن' },
-        warehouse: { name: 'المستودع الرئيسي' },
-        quantity: 3500,
-        unit: 'كجم',
-        min_quantity: 1000,
-        max_quantity: 5000,
-        last_update: '2023-11-20T10:30:00'
-      },
-      { 
-        id: '2', 
-        product: { name: 'النحاس النقي' }, 
-        category: { name: 'معادن' },
-        warehouse: { name: 'مستودع المواد الأولية' },
-        quantity: 1200,
-        unit: 'كجم',
-        min_quantity: 500,
-        max_quantity: 2000,
-        last_update: '2023-11-18T14:45:00'
-      },
-      { 
-        id: '3', 
-        product: { name: 'الورق المقوى' }, 
-        category: { name: 'ورق' },
-        warehouse: { name: 'المستودع الرئيسي' },
-        quantity: 8500,
-        unit: 'كجم',
-        min_quantity: 2000,
-        max_quantity: 10000,
-        last_update: '2023-11-19T09:15:00'
-      },
-      { 
-        id: '4', 
-        product: { name: 'الزجاج المكسر' }, 
-        category: { name: 'زجاج' },
-        warehouse: { name: 'مستودع الزجاج' },
-        quantity: 4200,
-        unit: 'كجم',
-        min_quantity: 1000,
-        max_quantity: 6000,
-        last_update: '2023-11-17T16:20:00'
-      },
-      { 
-        id: '5', 
-        product: { name: 'البلاستيك PET' }, 
-        category: { name: 'بلاستيك' },
-        warehouse: { name: 'مستودع البلاستيك' },
-        quantity: 5600,
-        unit: 'كجم',
-        min_quantity: 2000,
-        max_quantity: 8000,
-        last_update: '2023-11-16T11:50:00'
+    const loadInventory = async () => {
+      setLoading(true);
+      try {
+        if (!supabase) {
+          throw new Error('Supabase غير متاح');
+        }
+
+        // جلب جميع المخازن أولاً
+        const warehouses = await warehouseService.getAll();
+        const warehouseMap = new Map((warehouses || []).map((w: any) => [w.id, w]));
+
+        // جلب جميع المخزون من warehouse_inventory مع البيانات المرتبطة
+        // ملاحظة: نستخدم select بسيط أولاً ثم نضيف الـ joins بشكل منفصل لتجنب مشاكل الـ joins
+        const { data: inventoryData, error: inventoryError } = await supabase
+          .from('warehouse_inventory')
+          .select(`
+            *,
+            warehouses:warehouse_id(id, name)
+          `)
+          .order('last_updated', { ascending: false });
+
+        if (inventoryError) {
+          console.error('خطأ في جلب المخزون:', inventoryError);
+          throw inventoryError;
+        }
+
+        console.log('تم جلب المخزون:', inventoryData?.length || 0, 'عنصر');
+        if (inventoryData && inventoryData.length > 0) {
+          console.log('عينة من البيانات:', JSON.stringify(inventoryData[0], null, 2));
+        }
+
+        // جلب البيانات المرتبطة بشكل منفصل لكل نوع
+        const productIds = new Set<string>();
+        const catalogWasteIds = new Set<number>();
+        const catalogProductIds = new Set<number>();
+        const storeProductIds = new Set<string>();
+
+        (inventoryData || []).forEach((item: any) => {
+          if (item.product_id) productIds.add(item.product_id);
+          if (item.catalog_waste_id) catalogWasteIds.add(item.catalog_waste_id);
+          if (item.catalog_product_id) catalogProductIds.add(item.catalog_product_id);
+          if (item.store_product_id) storeProductIds.add(item.store_product_id);
+        });
+
+        // جلب waste_data_admin
+        const wasteDataAdminMap = new Map();
+        if (productIds.size > 0) {
+          const { data: wasteData } = await supabase
+            .from('waste_data_admin')
+            .select(`
+              id,
+              name,
+              category_id,
+              subcategory_id,
+              categories:category_id(name),
+              subcategories:subcategory_id(name)
+            `)
+            .in('id', Array.from(productIds));
+          
+          if (wasteData) {
+            wasteData.forEach((item: any) => {
+              wasteDataAdminMap.set(item.id, item);
+            });
+          }
+        }
+
+        // جلب catalog_waste_materials
+        // أولاً: جلب المخلفات المرتبطة مباشرة
+        const catalogWasteMap = new Map();
+        if (catalogWasteIds.size > 0) {
+          const { data: catalogWaste } = await supabase
+            .from('catalog_waste_materials')
+            .select(`
+              id,
+              waste_no,
+              notes,
+              main_category_id,
+              sub_category_id,
+              warehouse_id,
+              main_category:unified_main_categories(name, name_ar),
+              sub_category:unified_sub_categories(name, name_ar)
+            `)
+            .in('id', Array.from(catalogWasteIds));
+          
+          if (catalogWaste) {
+            catalogWaste.forEach((item: any) => {
+              catalogWasteMap.set(item.id, item);
+            });
+          }
+        }
+
+        // ثانياً: جلب جميع المخلفات المرتبطة بالمخازن الموجودة في inventory
+        // لمحاولة ربط العناصر التي لا تحتوي على catalog_waste_id
+        const warehouseIds = new Set((inventoryData || []).map((item: any) => item.warehouse_id).filter(Boolean));
+        const catalogWasteByWarehouseMap = new Map(); // Map<warehouse_id, catalog_waste[]>
+        
+        if (warehouseIds.size > 0) {
+          const { data: allCatalogWaste } = await supabase
+            .from('catalog_waste_materials')
+            .select(`
+              id,
+              waste_no,
+              notes,
+              main_category_id,
+              sub_category_id,
+              warehouse_id,
+              main_category:unified_main_categories(name, name_ar),
+              sub_category:unified_sub_categories(name, name_ar)
+            `)
+            .in('warehouse_id', Array.from(warehouseIds));
+          
+          if (allCatalogWaste) {
+            allCatalogWaste.forEach((waste: any) => {
+              if (waste.warehouse_id) {
+                if (!catalogWasteByWarehouseMap.has(waste.warehouse_id)) {
+                  catalogWasteByWarehouseMap.set(waste.warehouse_id, []);
+                }
+                catalogWasteByWarehouseMap.get(waste.warehouse_id).push(waste);
+                // أيضاً إضافة إلى catalogWasteMap إذا لم يكن موجوداً
+                if (!catalogWasteMap.has(waste.id)) {
+                  catalogWasteMap.set(waste.id, waste);
+                }
+              }
+            });
+          }
+        }
+
+        // جلب catalog_products
+        const catalogProductsMap = new Map();
+        if (catalogProductIds.size > 0) {
+          const { data: catalogProducts } = await supabase
+            .from('catalog_products')
+            .select('id, name, sku')
+            .in('id', Array.from(catalogProductIds));
+          
+          if (catalogProducts) {
+            catalogProducts.forEach((item: any) => {
+              catalogProductsMap.set(item.id, item);
+            });
+          }
+        }
+
+        // جلب store_products
+        const storeProductsMap = new Map();
+        if (storeProductIds.size > 0) {
+          const { data: storeProducts } = await supabase
+            .from('store_products')
+            .select('id, name, sku')
+            .in('id', Array.from(storeProductIds));
+          
+          if (storeProducts) {
+            storeProducts.forEach((item: any) => {
+              storeProductsMap.set(item.id, item);
+            });
+          }
+        }
+
+        // جلب الفئات من categories و unified_main_categories
+        const { data: categoriesData } = await supabase
+          .from('categories')
+          .select('id, name');
+        const categoryMap = new Map((categoriesData || []).map((c: any) => [c.id, c.name]));
+
+        const { data: wasteMainCategoriesData } = await supabase
+          .from('unified_main_categories')
+          .select('id, name, name_ar')
+          .in('item_type', ['waste', 'both'])
+          .eq('is_active', true);
+        const wasteCategoryMap = new Map((wasteMainCategoriesData || []).map((c: any) => [c.id, c.name]));
+
+        // تحويل البيانات إلى الشكل المطلوب
+        const mappedInventory: InventoryItem[] = (inventoryData || []).map((item: any) => {
+          // استخدام الـ Maps للبحث عن البيانات المرتبطة
+          const wasteDataAdmin = item.product_id ? wasteDataAdminMap.get(item.product_id) : null;
+          let catalogWaste = item.catalog_waste_id ? catalogWasteMap.get(item.catalog_waste_id) : null;
+          const catalogProduct = item.catalog_product_id ? catalogProductsMap.get(item.catalog_product_id) : null;
+          const storeProduct = item.store_product_id ? storeProductsMap.get(item.store_product_id) : null;
+
+          // إذا لم يكن هناك ربط مباشر وكان هناك مخلفات في نفس المخزن،
+          // نحاول استخدام أول مخلف متاح في نفس المخزن
+          if (!wasteDataAdmin && !catalogWaste && !catalogProduct && !storeProduct && item.warehouse_id) {
+            const wastesInWarehouse = catalogWasteByWarehouseMap.get(item.warehouse_id);
+            if (wastesInWarehouse && wastesInWarehouse.length > 0) {
+              // استخدام أول مخلف متاح في نفس المخزن
+              catalogWaste = wastesInWarehouse[0];
+              console.log(`ربط تلقائي: عنصر ${item.id} مع مخلف ${catalogWaste.id} في نفس المخزن ${item.warehouse_id}`);
+            }
+          }
+
+          // Debug: طباعة بيانات العنصر للمساعدة في التصحيح
+          if (!wasteDataAdmin && !catalogWaste && !catalogProduct && !storeProduct) {
+            console.warn('عنصر بدون بيانات مرتبطة:', {
+              id: item.id,
+              warehouse_id: item.warehouse_id,
+              product_id: item.product_id,
+              catalog_waste_id: item.catalog_waste_id,
+              catalog_product_id: item.catalog_product_id,
+              store_product_id: item.store_product_id
+            });
+          }
+
+          // تحديد اسم المنتج/المخلف ونوعه
+          let productName = 'غير محدد';
+          let itemType: 'product' | 'waste' | 'unknown' = 'unknown';
+          
+          // التحقق من waste_data_admin (منتجات)
+          if (wasteDataAdmin?.name) {
+            productName = wasteDataAdmin.name;
+            itemType = 'product';
+          }
+          // التحقق من catalog_waste_materials (مخلفات)
+          else if (catalogWaste) {
+            productName = catalogWaste.notes || 
+                         catalogWaste.waste_no || 
+                         `مخلف #${catalogWaste.id}`;
+            itemType = 'waste';
+          }
+          // التحقق من catalog_products (منتجات من الكتالوج)
+          else if (catalogProduct?.name) {
+            productName = catalogProduct.name;
+            itemType = 'product';
+          }
+          // التحقق من store_products (منتجات المتجر)
+          else if (storeProduct?.name) {
+            productName = storeProduct.name;
+            itemType = 'product';
+          }
+          // إذا لم نجد أي ربط وكان هناك مخلفات في نفس المخزن، نعرض "مخلف غير محدد"
+          else if (item.warehouse_id && catalogWasteByWarehouseMap.has(item.warehouse_id)) {
+            const wastesInWarehouse = catalogWasteByWarehouseMap.get(item.warehouse_id);
+            if (wastesInWarehouse && wastesInWarehouse.length > 0) {
+              productName = `مخلف في المخزن`;
+              itemType = 'waste';
+            }
+          }
+
+          // تحديد اسم الفئة
+          let categoryName = 'غير محدد';
+          
+          // من waste_data_admin (منتجات)
+          if (wasteDataAdmin) {
+            if (wasteDataAdmin.categories?.name) {
+              categoryName = wasteDataAdmin.categories.name;
+            } else if (wasteDataAdmin.subcategories?.name) {
+              categoryName = wasteDataAdmin.subcategories.name;
+            } else if (wasteDataAdmin.category_id) {
+              categoryName = categoryMap.get(wasteDataAdmin.category_id) || 'فئة المنتج';
+            }
+          }
+          // من catalog_waste_materials (مخلفات)
+          else if (catalogWaste) {
+            if (catalogWaste.main_category?.name) {
+              categoryName = catalogWaste.main_category.name;
+            } else if (catalogWaste.sub_category?.name) {
+              categoryName = catalogWaste.sub_category.name;
+            } else if (catalogWaste.main_category_id) {
+              categoryName = wasteCategoryMap.get(catalogWaste.main_category_id) || 'فئة المخلف';
+            }
+          }
+
+          // جلب معلومات المخزن
+          const warehouse = warehouseMap.get(item.warehouse_id) || { id: item.warehouse_id, name: `مخزن #${item.warehouse_id}` };
+
+          return {
+            id: item.id,
+            product_id: item.product_id,
+            catalog_waste_id: item.catalog_waste_id,
+            product: { name: productName },
+            category: { name: categoryName },
+            item_type: itemType,
+            warehouse: { id: warehouse.id, name: warehouse.name },
+            quantity: parseFloat(item.quantity?.toString() || '0'),
+            unit: item.unit || 'كجم',
+            min_quantity: item.min_level ? parseFloat(item.min_level.toString()) : null,
+            max_quantity: item.max_level ? parseFloat(item.max_level.toString()) : null,
+            last_update: item.last_updated || new Date().toISOString(),
+          };
+        });
+
+        setInventory(mappedInventory);
+      } catch (error) {
+        console.error('خطأ في تحميل المخزون:', error);
+        // في حالة الخطأ، نعرض قائمة فارغة بدلاً من البيانات الوهمية
+        setInventory([]);
+      } finally {
+        setLoading(false);
       }
-    ];
-    
-    setTimeout(() => {
-      setInventory(dummyData);
-      setLoading(false);
-    }, 1000);
+    };
+
+    loadInventory();
   }, []);
 
   // جلب قائمة المخازن الحقيقية لعرضها في قائمة المستودعات
@@ -141,7 +371,59 @@ const InventoryManagementPage: React.FC = () => {
         const data = await warehouseService.getAll();
         const mapped = (data || []).map((w: any) => ({ id: w.id, name: w.name, warehouse_type: w.warehouse_type }));
         setWarehouseList(mapped);
-      } catch {}
+      } catch (error) {
+        console.error('خطأ في جلب المخازن:', error);
+      }
+    })();
+  }, []);
+
+  // جلب قائمة الفئات الحقيقية من قاعدة البيانات
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!supabase) return;
+
+        // جلب الفئات من categories (للمنتجات)
+        const { data: productCategories } = await supabase
+          .from('categories')
+          .select('name')
+          .order('name');
+
+        // جلب الفئات من unified_main_categories و unified_sub_categories (للمخلفات)
+        const { data: mainCategories } = await supabase
+          .from('unified_main_categories')
+          .select('name, name_ar')
+          .in('item_type', ['waste', 'both'])
+          .eq('is_active', true)
+          .order('name_ar', { ascending: true, nullsFirst: false })
+          .order('name');
+
+        const { data: subCategories } = await supabase
+          .from('unified_sub_categories')
+          .select('name, name_ar')
+          .in('item_type', ['waste', 'both'])
+          .eq('is_active', true)
+          .order('name_ar', { ascending: true, nullsFirst: false })
+          .order('name');
+
+        // دمج جميع الفئات وإزالة التكرار
+        const allCategories = new Set<string>();
+        if (productCategories) {
+          productCategories.forEach((cat: any) => allCategories.add(cat.name));
+        }
+        if (mainCategories) {
+          mainCategories.forEach((cat: any) => allCategories.add(cat.name));
+        }
+        if (subCategories) {
+          subCategories.forEach((cat: any) => allCategories.add(cat.name));
+        }
+
+        setCategoryList(['all', ...Array.from(allCategories).sort()]);
+      } catch (error) {
+        console.error('خطأ في جلب الفئات:', error);
+        // في حالة الخطأ، نستخدم قائمة افتراضية
+        setCategoryList(['all', 'معادن', 'ورق', 'زجاج', 'بلاستيك']);
+      }
     })();
   }, []);
 
@@ -163,7 +445,7 @@ const InventoryManagementPage: React.FC = () => {
     })();
   }, []);
   
-  const categories = ['all', 'معادن', 'ورق', 'زجاج', 'بلاستيك'];
+  const categories = categoryList.length > 0 ? categoryList : ['all', 'معادن', 'ورق', 'زجاج', 'بلاستيك'];
   const warehouses = ['all', ...new Set(warehouseList.map((w) => w.name))] as string[];
 
   const typeLabel = (t?: 'products' | 'waste' | 'mixed') => {
@@ -174,11 +456,11 @@ const InventoryManagementPage: React.FC = () => {
   };
   
   const filteredItems = inventory.filter(item => {
-    const matchesSearch = item.product.name.includes(searchTerm) || 
-                         item.category.name.includes(searchTerm);
-    const matchesCategory = categoryFilter === 'all' || item.category.name === categoryFilter;
+    const matchesSearch = item.product?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         item.category?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+    const matchesCategory = categoryFilter === 'all' || item.category?.name === categoryFilter;
     const matchesWarehouse = warehouseFilter === 'all' || item.warehouse.name === warehouseFilter;
-    const matchesMin = !onlyBelowMin || item.quantity <= item.min_quantity;
+    const matchesMin = !onlyBelowMin || (item.min_quantity !== null && item.quantity <= item.min_quantity);
     return matchesSearch && matchesCategory && matchesWarehouse && matchesMin;
   });
 
@@ -191,9 +473,9 @@ const InventoryManagementPage: React.FC = () => {
     }).format(date);
   };
 
-  const getStockStatus = (quantity: number, min: number, max: number) => {
-    if (quantity <= min) return { label: 'منخفض', class: 'bg-red-100 text-red-800' };
-    if (quantity >= max) return { label: 'زائد', class: 'bg-blue-100 text-blue-800' };
+  const getStockStatus = (quantity: number, min: number | null, max: number | null) => {
+    if (min !== null && quantity <= min) return { label: 'منخفض', class: 'bg-red-100 text-red-800' };
+    if (max !== null && quantity >= max) return { label: 'زائد', class: 'bg-blue-100 text-blue-800' };
     return { label: 'جيد', class: 'bg-green-100 text-green-800' };
   };
 
@@ -225,11 +507,122 @@ const InventoryManagementPage: React.FC = () => {
           <Button 
             variant="outline" 
             size="icon"
-            onClick={() => {
+            onClick={async () => {
               setLoading(true);
-              // في المستقبل
-              // dispatch(fetchInventoryItems())
-              setTimeout(() => setLoading(false), 1000);
+              try {
+                if (!supabase) return;
+                
+                const warehouses = await warehouseService.getAll();
+                const warehouseMap = new Map((warehouses || []).map((w: any) => [w.id, w]));
+
+                // جلب الفئات
+                const { data: categoriesData } = await supabase
+                  .from('categories')
+                  .select('id, name');
+                const categoryMap = new Map((categoriesData || []).map((c: any) => [c.id, c.name]));
+
+                const { data: wasteMainCategoriesData } = await supabase
+                  .from('unified_main_categories')
+                  .select('id, name, name_ar')
+                  .in('item_type', ['waste', 'both'])
+                  .eq('is_active', true);
+                const wasteCategoryMap = new Map((wasteMainCategoriesData || []).map((c: any) => [c.id, c.name]));
+
+                const { data: inventoryData, error } = await supabase
+                  .from('warehouse_inventory')
+                  .select(`
+                    *,
+                    warehouses:warehouse_id(id, name),
+                    waste_data_admin:product_id(
+                      id,
+                      name,
+                      category_id,
+                      subcategory_id,
+                      categories:category_id(name),
+                      subcategories:subcategory_id(name)
+                    ),
+                    catalog_waste_materials:catalog_waste_id(
+                      id,
+                      waste_no,
+                      notes,
+                      main_category_id,
+                      sub_category_id,
+                      main_category:unified_main_categories(name, name_ar),
+                      sub_category:unified_sub_categories(name, name_ar)
+                    ),
+                    catalog_products:catalog_product_id(id, name, sku),
+                    store_products:store_product_id(id, name, sku)
+                  `)
+                  .order('last_updated', { ascending: false });
+
+                if (error) throw error;
+
+                const mappedInventory: InventoryItem[] = (inventoryData || []).map((item: any) => {
+                  // تحديد اسم المنتج/المخلف ونوعه
+                  let productName = 'غير محدد';
+                  let itemType: 'product' | 'waste' | 'unknown' = 'unknown';
+                  
+                  if (item.waste_data_admin?.name) {
+                    productName = item.waste_data_admin.name;
+                    itemType = 'product';
+                  } else if (item.catalog_waste_materials) {
+                    productName = item.catalog_waste_materials.notes || 
+                                 item.catalog_waste_materials.waste_no || 
+                                 `مخلف #${item.catalog_waste_materials.id}`;
+                    itemType = 'waste';
+                  } else if (item.catalog_products?.name) {
+                    productName = item.catalog_products.name;
+                    itemType = 'product';
+                  } else if (item.store_products?.name) {
+                    productName = item.store_products.name;
+                    itemType = 'product';
+                  }
+
+                  // تحديد اسم الفئة
+                  let categoryName = 'غير محدد';
+                  
+                  if (item.waste_data_admin) {
+                    if (item.waste_data_admin.categories?.name) {
+                      categoryName = item.waste_data_admin.categories.name;
+                    } else if (item.waste_data_admin.subcategories?.name) {
+                      categoryName = item.waste_data_admin.subcategories.name;
+                    } else if (item.waste_data_admin.category_id) {
+                      categoryName = categoryMap.get(item.waste_data_admin.category_id) || 'فئة المنتج';
+                    }
+                  } else if (item.catalog_waste_materials) {
+                    if (item.catalog_waste_materials.main_category?.name) {
+                      categoryName = item.catalog_waste_materials.main_category.name;
+                    } else if (item.catalog_waste_materials.sub_category?.name) {
+                      categoryName = item.catalog_waste_materials.sub_category.name;
+                    } else if (item.catalog_waste_materials.main_category_id) {
+                      categoryName = wasteCategoryMap.get(item.catalog_waste_materials.main_category_id) || 'فئة المخلف';
+                    }
+                  }
+
+                  const warehouse = warehouseMap.get(item.warehouse_id) || { id: item.warehouse_id, name: `مخزن #${item.warehouse_id}` };
+
+                  return {
+                    id: item.id,
+                    product_id: item.product_id,
+                    catalog_waste_id: item.catalog_waste_id,
+                    product: { name: productName },
+                    category: { name: categoryName },
+                    item_type: itemType,
+                    warehouse: { id: warehouse.id, name: warehouse.name },
+                    quantity: parseFloat(item.quantity?.toString() || '0'),
+                    unit: item.unit || 'كجم',
+                    min_quantity: item.min_level ? parseFloat(item.min_level.toString()) : null,
+                    max_quantity: item.max_level ? parseFloat(item.max_level.toString()) : null,
+                    last_update: item.last_updated || new Date().toISOString(),
+                  };
+                });
+
+                setInventory(mappedInventory);
+              } catch (error) {
+                console.error('خطأ في تحديث المخزون:', error);
+              } finally {
+                setLoading(false);
+              }
             }}
           >
             <FiRefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
@@ -490,6 +883,7 @@ const InventoryManagementPage: React.FC = () => {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[100px]">المادة</TableHead>
+                <TableHead>النوع</TableHead>
                 <TableHead>الفئة</TableHead>
                 <TableHead>المستودع</TableHead>
                 <TableHead className="text-center">الكمية</TableHead>
@@ -503,26 +897,33 @@ const InventoryManagementPage: React.FC = () => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8">جاري تحميل البيانات...</TableCell>
+                  <TableCell colSpan={10} className="text-center py-8">جاري تحميل البيانات...</TableCell>
                 </TableRow>
               ) : (
                 filteredItems.map((item) => {
                   const status = getStockStatus(item.quantity, item.min_quantity, item.max_quantity);
+                  const typeLabel = item.item_type === 'product' ? 'منتج' : item.item_type === 'waste' ? 'مخلف' : 'غير محدد';
+                  const typeColor = item.item_type === 'product' ? 'bg-blue-100 text-blue-800' : item.item_type === 'waste' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
                   return (
                     <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.product.name}</TableCell>
-                      <TableCell>{item.category.name}</TableCell>
+                      <TableCell className="font-medium">{item.product?.name || 'غير محدد'}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs ${typeColor}`}>
+                          {typeLabel}
+                        </span>
+                      </TableCell>
+                      <TableCell>{item.category?.name || 'غير محدد'}</TableCell>
                       <TableCell>{item.warehouse.name}</TableCell>
-                      <TableCell className="text-center">{item.quantity.toLocaleString()} {item.unit}</TableCell>
-                      <TableCell className="text-center">{item.min_quantity.toLocaleString()}</TableCell>
-                      <TableCell className="text-center">{item.max_quantity.toLocaleString()}</TableCell>
+                      <TableCell className="text-center">{item.quantity.toLocaleString()} {item.unit || 'كجم'}</TableCell>
+                      <TableCell className="text-center">{item.min_quantity?.toLocaleString() || '-'}</TableCell>
+                      <TableCell className="text-center">{item.max_quantity?.toLocaleString() || '-'}</TableCell>
                       <TableCell className="text-center">
                         <span className={`px-2 py-1 rounded-full text-xs ${status.class}`}>
                           {status.label}
                         </span>
                       </TableCell>
                       <TableCell className="text-center text-sm text-gray-500">
-                        {formatDate(item.last_update)}
+                        {item.last_update ? formatDate(item.last_update) : '-'}
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-2">
@@ -541,7 +942,7 @@ const InventoryManagementPage: React.FC = () => {
               
               {!loading && filteredItems.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8">لا توجد نتائج للبحث</TableCell>
+                  <TableCell colSpan={10} className="text-center py-8">لا توجد نتائج للبحث</TableCell>
                 </TableRow>
               )}
             </TableBody>

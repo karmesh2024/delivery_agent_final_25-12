@@ -25,6 +25,7 @@ import {
   MetalType 
 } from '@/services/wasteCatalogService';
 import { Wizard } from '@/shared/components/Wizard';
+import { uploadFile, getPublicImageUrl, supabase } from '@/lib/supabase';
 
 // سيتم تحميل البيانات من قاعدة البيانات
 
@@ -81,8 +82,8 @@ interface WasteFormData {
   source_code: string;
   reason_id: number | null;
   related_product_id: number | null;
-  main_category_id: number | null;
-  sub_category_id: number | null;
+  main_category_id: number | string | null; // دعم UUID من unified_main_categories
+  sub_category_id: number | string | null; // دعم UUID من unified_sub_categories
   plastic_type_id: number | null;
   metal_type_id: number | null;
   plastic_code: string;
@@ -380,14 +381,9 @@ export default function WasteCatalogFormWizard({ wasteId, initialData }: WasteCa
         const warehousesData = await wasteCatalogService.getWarehouses();
         setWarehouses(warehousesData);
         
-        // تحميل الفئات الرئيسية للمخلفات
-        const wasteMainCategoriesData = await wasteCatalogService.getWasteMainCategories();
-        setWasteMainCategories(wasteMainCategoriesData);
-        
         // تحميل الوحدات
         const unitsData = await wasteCatalogService.getUnits();
         setUnits(unitsData);
-        
         
         // تحميل البيانات الجديدة للنظام المحسن
         const sectorsData = await wasteCatalogService.getWasteSectors();
@@ -400,6 +396,14 @@ export default function WasteCatalogFormWizard({ wasteId, initialData }: WasteCa
         ]);
         setPlasticTypes(plasticTypesData);
         setMetalTypes(metalTypesData);
+        
+        // تحميل الفئات الرئيسية للمخلفات (سيتم تحديثها عند اختيار القطاع)
+        // إذا كان هناك قطاع محدد مسبقاً في initialData، فلن يتم تحميل الفئات هنا
+        // لأن useEffect الخاص بالقطاع سيتولى ذلك
+        if (!initialData?.sector_id) {
+          const wasteMainCategoriesData = await wasteCatalogService.getWasteMainCategories();
+          setWasteMainCategories(wasteMainCategoriesData);
+        }
         
       } catch (error) {
         console.error('خطأ في تحميل البيانات:', error);
@@ -458,25 +462,73 @@ export default function WasteCatalogFormWizard({ wasteId, initialData }: WasteCa
     loadMaterialTypes();
   }, [formData.sub_category_id, formData.main_category_id, wasteMainCategories]);
 
-  // تحميل أنواع العملاء عند تغيير القطاع
+  // تحميل أنواع العملاء والفئات الأساسية عند تغيير القطاع
   useEffect(() => {
-    const loadClientTypes = async () => {
+    const loadClientTypesAndCategories = async () => {
       if (formData.sector_id) {
         try {
+          // الحصول على UUID للقطاع من القائمة المحملة
+          let sectorUUID: string | number | undefined = formData.sector_id;
+          
+          // البحث عن القطاع في القائمة المحملة
+          // formData.sector_id قد يكون string (UUID) أو number (index أو id من الجداول القديمة)
+          const sectorIdStr = formData.sector_id.toString();
+          const selectedSector = sectors.find((s: any) => {
+            // البحث باستخدام id (قد يكون UUID string أو number)
+            return s.id.toString() === sectorIdStr;
+          });
+          
+          if (selectedSector) {
+            // استخدام id من القطاع المحدد
+            sectorUUID = selectedSector.id;
+            console.log('✅ تم العثور على القطاع في القائمة:', selectedSector.name, 'UUID:', sectorUUID);
+          } else {
+            // إذا لم نجد في القائمة، استخدم القيمة الأصلية
+            console.warn('⚠️ لم يتم العثور على القطاع في القائمة المحملة، استخدام القيمة الأصلية:', formData.sector_id);
+            sectorUUID = formData.sector_id;
+          }
+
+          // تحميل أنواع العملاء
           const clientTypesData = await wasteCatalogService.getClientTypes(Number(formData.sector_id));
           setClientTypes(clientTypesData);
           // إعادة تعيين نوع العميل عند تغيير القطاع
           handleFormChange('client_type_id', null);
+
+          // تحميل الفئات الأساسية المرتبطة بهذا القطاع
+          console.log('🔍 جلب الفئات الأساسية للقطاع:', sectorUUID, 'من القائمة:', sectors.length);
+          const mainCategoriesData = await wasteCatalogService.getWasteMainCategories(sectorUUID);
+          console.log('📋 الفئات الأساسية المستلمة:', mainCategoriesData);
+          setWasteMainCategories(mainCategoriesData);
+          
+          if (mainCategoriesData.length === 0) {
+            toast.warning('لا توجد فئات أساسية مرتبطة بهذا القطاع. تأكد من وجود تصنيفات وفئات في إدارة التنظيم والتسلسل.');
+          }
+          
+          // إعادة تعيين الفئات عند تغيير القطاع
+          handleFormChange('main_category_id', null);
+          handleFormChange('sub_category_id', null);
+          setWasteSubCategories([]);
         } catch (error) {
-          console.error('خطأ في تحميل أنواع العملاء:', error);
+          console.error('خطأ في تحميل أنواع العملاء والفئات:', error);
+          toast.error('حدث خطأ أثناء تحميل الفئات الأساسية');
         }
       } else {
         setClientTypes([]);
         handleFormChange('client_type_id', null);
+        
+        // تحميل جميع الفئات الأساسية إذا لم يتم اختيار قطاع
+        wasteCatalogService.getWasteMainCategories().then(data => {
+          setWasteMainCategories(data);
+        });
+        
+        // إعادة تعيين الفئات
+        handleFormChange('main_category_id', null);
+        handleFormChange('sub_category_id', null);
+        setWasteSubCategories([]);
       }
     };
 
-    loadClientTypes();
+    loadClientTypesAndCategories();
   }, [formData.sector_id]);
 
   // تحميل المصادر المتاحة عند تغيير نوع العميل
@@ -862,37 +914,23 @@ export default function WasteCatalogFormWizard({ wasteId, initialData }: WasteCa
   };
 
   const handleAddWasteMainCategory = async () => {
-    if (newWasteMainCategory.name.trim() && newWasteMainCategory.code.trim()) {
-      try {
-        const result = await wasteCatalogService.addWasteMainCategory(newWasteMainCategory.code, newWasteMainCategory.name);
-        if (result) {
-          // تحديث قائمة الفئات الرئيسية للمخلفات
-          setWasteMainCategories(prev => [...prev, result]);
-          toast.success(`تم إضافة الفئة الأساسية: ${newWasteMainCategory.name}`);
-          setNewWasteMainCategory({ code: '', name: '' });
-          setShowMainCategoryDialog(false);
-        }
-      } catch (error) {
-        toast.error('فشل في إضافة الفئة الأساسية');
-      }
-    }
+    // توجيه المستخدم لصفحة إدارة التنظيم والتسلسل لإضافة فئات جديدة
+    toast.info('يرجى استخدام صفحة "إدارة التنظيم والتسلسل" لإضافة فئات جديدة. سيتم فتح الصفحة...', {
+      duration: 3000,
+    });
+    setShowMainCategoryDialog(false);
+    // يمكن إضافة redirect لاحقاً إذا لزم الأمر
+    // router.push('/warehouse-management/organization-structure');
   };
 
   const handleAddWasteSubCategory = async () => {
-    if (newWasteSubCategory.name.trim() && newWasteSubCategory.code.trim() && newWasteSubCategory.main_id) {
-      try {
-        const result = await wasteCatalogService.addWasteSubCategory(newWasteSubCategory.code, newWasteSubCategory.name, newWasteSubCategory.main_id);
-        if (result) {
-          // تحديث قائمة الفئات الفرعية للمخلفات
-          setWasteSubCategories(prev => [...prev, result]);
-          toast.success(`تم إضافة الفئة الفرعية: ${newWasteSubCategory.name}`);
-          setNewWasteSubCategory({ code: '', name: '', main_id: null });
-          setShowSubCategoryDialog(false);
-        }
-      } catch (error) {
-        toast.error('فشل في إضافة الفئة الفرعية');
-      }
-    }
+    // توجيه المستخدم لصفحة إدارة التنظيم والتسلسل لإضافة فئات جديدة
+    toast.info('يرجى استخدام صفحة "إدارة التنظيم والتسلسل" لإضافة فئات جديدة. سيتم فتح الصفحة...', {
+      duration: 3000,
+    });
+    setShowSubCategoryDialog(false);
+    // يمكن إضافة redirect لاحقاً إذا لزم الأمر
+    // router.push('/warehouse-management/organization-structure');
   };
 
   const canGoNext = () => {
@@ -958,8 +996,8 @@ export default function WasteCatalogFormWizard({ wasteId, initialData }: WasteCa
         max_storage_days: formData.max_storage_days || undefined,
         alert_on_exceed: formData.alert_on_exceed || false,
         status: formData.status || 'waiting',
-        images: isEditing ? (initialData?.images || []) : [], // TODO: رفع الصور إلى Supabase Storage
-        documents: isEditing ? (initialData?.documents || []) : [], // TODO: رفع المستندات إلى Supabase Storage
+        images: [], // سيتم ملؤها بعد رفع الصور
+        documents: [], // سيتم ملؤها بعد رفع المستندات
         notes: formData.notes || undefined,
         emergency_flags: formData.emergency_flags,
         qr_code: formData.qr_code || undefined,
@@ -968,6 +1006,113 @@ export default function WasteCatalogFormWizard({ wasteId, initialData }: WasteCa
         initial_sorting_percentage: formData.initial_sorting_percentage,
         pollution_percentage: formData.pollution_percentage
       };
+
+      // رفع الصور إلى Supabase Storage
+      const uploadedImageUrls: string[] = [];
+      
+      if (formData.images && formData.images.length > 0) {
+        toast.info('جاري رفع الصور...');
+        
+        // التحقق من وجود bucket (تم إنشاؤه عبر MCP Supabase)
+        const bucketName = 'waste-images';
+        if (supabase) {
+          try {
+            const { data: buckets } = await supabase.storage.listBuckets();
+            const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
+            
+            if (!bucketExists) {
+              console.warn(`⚠️ bucket ${bucketName} غير موجود. يرجى إنشاؤه في Supabase Dashboard وجعله public.`);
+              toast.warning(`يرجى إنشاء bucket ${bucketName} في Supabase Dashboard وجعله public`);
+            } else {
+              console.log(`✅ bucket ${bucketName} موجود`);
+            }
+          } catch (error) {
+            console.error(`خطأ في التحقق من bucket ${bucketName}:`, error);
+          }
+        }
+        
+        for (const imageFile of formData.images) {
+          if (imageFile instanceof File) {
+            try {
+              const folderPath = `catalog-waste/${formData.waste_no || 'temp'}`;
+              const sanitizedFileName = imageFile.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+              const fileName = `${Date.now()}-${sanitizedFileName}`;
+
+              const { path, error: uploadError } = await uploadFile(bucketName, imageFile, folderPath, fileName);
+
+              if (uploadError) {
+                console.error('خطأ في رفع الصورة:', uploadError);
+                toast.error(`فشل رفع صورة: ${imageFile.name}`);
+                continue;
+              }
+
+              if (path) {
+                const publicUrl = getPublicImageUrl(bucketName, path);
+                if (publicUrl) {
+                  uploadedImageUrls.push(publicUrl);
+                }
+              }
+            } catch (error) {
+              console.error('خطأ في رفع الصورة:', error);
+              toast.error(`فشل رفع صورة: ${imageFile.name}`);
+            }
+          } else if (typeof imageFile === 'string') {
+            // إذا كانت URL موجودة بالفعل (في حالة التعديل)
+            uploadedImageUrls.push(imageFile);
+          }
+        }
+        
+        if (uploadedImageUrls.length > 0) {
+          toast.success(`تم رفع ${uploadedImageUrls.length} صورة بنجاح`);
+        }
+      }
+
+      // رفع المستندات إلى Supabase Storage
+      const uploadedDocumentUrls: string[] = [];
+      
+      if (formData.documents && formData.documents.length > 0) {
+        toast.info('جاري رفع المستندات...');
+        
+        for (const docFile of formData.documents) {
+          if (docFile instanceof File) {
+            try {
+              const bucketName = 'waste-documents'; // يمكن تغييره حسب الحاجة
+              const folderPath = `catalog-waste/${formData.waste_no || 'temp'}`;
+              const sanitizedFileName = docFile.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+              const fileName = `${Date.now()}-${sanitizedFileName}`;
+
+              const { path, error: uploadError } = await uploadFile(bucketName, docFile, folderPath, fileName);
+
+              if (uploadError) {
+                console.error('خطأ في رفع المستند:', uploadError);
+                toast.error(`فشل رفع مستند: ${docFile.name}`);
+                continue;
+              }
+
+              if (path) {
+                const publicUrl = getPublicImageUrl(bucketName, path);
+                if (publicUrl) {
+                  uploadedDocumentUrls.push(publicUrl);
+                }
+              }
+            } catch (error) {
+              console.error('خطأ في رفع المستند:', error);
+              toast.error(`فشل رفع مستند: ${docFile.name}`);
+            }
+          } else if (typeof docFile === 'string') {
+            // إذا كانت URL موجودة بالفعل (في حالة التعديل)
+            uploadedDocumentUrls.push(docFile);
+          }
+        }
+        
+        if (uploadedDocumentUrls.length > 0) {
+          toast.success(`تم رفع ${uploadedDocumentUrls.length} مستند بنجاح`);
+        }
+      }
+
+      // تحديث wasteData بالصور والمستندات المرفوعة
+      wasteData.images = uploadedImageUrls;
+      wasteData.documents = uploadedDocumentUrls;
 
       let result: WasteCatalogItem | null = null;
       
@@ -982,6 +1127,14 @@ export default function WasteCatalogFormWizard({ wasteId, initialData }: WasteCa
         result = await wasteCatalogService.addWaste(wasteData);
         if (result) {
           toast.success('تم إضافة المخلفات بنجاح');
+          
+          // إرسال إشعار لتحديث البيانات في صفحات أخرى
+          window.dispatchEvent(new Event('wasteCatalogUpdated'));
+          
+          // إعادة تحميل البيانات في صفحة العرض إذا كانت مفتوحة
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('wasteCatalogLastUpdate', Date.now().toString());
+          }
         }
       }
       
@@ -1349,7 +1502,13 @@ export default function WasteCatalogFormWizard({ wasteId, initialData }: WasteCa
           <div className="flex gap-2">
             <Select
               value={formData.main_category_id?.toString() || ''}
-              onValueChange={(value) => handleFormChange('main_category_id', Number(value))}
+              onValueChange={(value) => {
+                // الحفاظ على UUID كـ string أو number حسب نوع البيانات
+                const categoryId = typeof wasteMainCategories.find(c => c.id.toString() === value)?.id === 'string' 
+                  ? value 
+                  : (value ? Number(value) : null);
+                handleFormChange('main_category_id', categoryId);
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="اختر الفئة الأساسية" />
@@ -1373,7 +1532,22 @@ export default function WasteCatalogFormWizard({ wasteId, initialData }: WasteCa
           <div className="flex gap-2">
             <Select
               value={formData.sub_category_id?.toString() || ''}
-              onValueChange={(value) => handleFormChange('sub_category_id', Number(value))}
+              onValueChange={(value) => {
+                // الحفاظ على UUID كـ string أو number حسب نوع البيانات
+                if (!value || value === '' || value === '0') {
+                  handleFormChange('sub_category_id', null);
+                  return;
+                }
+                
+                const foundCategory = wasteSubCategories.find(c => c.id.toString() === value);
+                if (foundCategory) {
+                  // استخدام ID كما هو (string أو number)
+                  handleFormChange('sub_category_id', foundCategory.id);
+                } else {
+                  // إذا لم نجد الفئة، استخدم value مباشرة (قد يكون UUID)
+                  handleFormChange('sub_category_id', value);
+                }
+              }}
               disabled={!formData.main_category_id}
             >
               <SelectTrigger>
