@@ -221,8 +221,9 @@ export const LivePriceTable: React.FC<LivePriceTableProps> = ({
       price24hAgo = Number(trend.price_24h_ago) || 0;
     }
     
-    // إذا لم يكن هناك trend أو price_24h_ago = 0، نستخدم base_price كسعر مرجعي
-    if (price24hAgo === 0 && basePrice > 0) {
+    // إذا لم يكن هناك trend أو price_24h_ago = 0 أو يساوي السعر الحالي
+    // نستخدم base_price كسعر مرجعي فقط إذا كان مختلفاً عن السعر الحالي
+    if ((price24hAgo === 0 || price24hAgo === buyPrice) && basePrice > 0 && basePrice !== buyPrice) {
       price24hAgo = basePrice;
     }
     

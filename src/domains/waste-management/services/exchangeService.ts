@@ -455,9 +455,10 @@ export const exchangeService = {
       
       let currentPricesMap = new Map<number, number>();
       if (stockExchangeIds.length > 0) {
+        // جلب الأسعار الحالية مع last_actual_purchase_price في نفس الاستعلام
         const { data: currentPrices, error: pricesError } = await supabase!
           .from("stock_exchange")
-          .select("id, buy_price")
+          .select("id, buy_price, last_actual_purchase_price, base_price")
           .in("id", stockExchangeIds);
         
         if (!pricesError && currentPrices) {
@@ -481,18 +482,23 @@ export const exchangeService = {
         trendsByStockExchange.get(stockExchangeId)!.push(curr);
       });
       
-      // جلب last_actual_purchase_price من stock_exchange
+      // جلب last_actual_purchase_price و base_price من stock_exchange
       let lastActualPurchasePricesMap = new Map<number, number>();
+      let basePricesMap = new Map<number, number>();
+      
       if (stockExchangeIds.length > 0) {
         const { data: actualPurchasePrices, error: actualPricesError } = await supabase!
           .from("stock_exchange")
-          .select("id, last_actual_purchase_price")
+          .select("id, last_actual_purchase_price, base_price")
           .in("id", stockExchangeIds);
         
         if (!actualPricesError && actualPurchasePrices) {
           actualPurchasePrices.forEach(price => {
             if (price.last_actual_purchase_price) {
               lastActualPurchasePricesMap.set(Number(price.id), Number(price.last_actual_purchase_price));
+            }
+            if (price.base_price) {
+              basePricesMap.set(Number(price.id), Number(price.base_price));
             }
           });
         }
@@ -511,19 +517,46 @@ export const exchangeService = {
         // استخدام last_actual_purchase_price كسعر مرجعي أولاً (الحل الاحترافي)
         let price24hAgo = lastActualPurchasePricesMap.get(stockExchangeId) || 0;
         
-        // إذا لم يكن هناك last_actual_purchase_price، نستخدم السعر من السجل الثاني (قبل الأخير)
+        // إذا لم يكن هناك last_actual_purchase_price، نستخدم السعر من exchange_price_history أولاً
+        // هذا يعطي مؤشراً دقيقاً عن التغير الفعلي في السعر
         if (price24hAgo === 0) {
-          if (records.length === 1) {
-            // سجل واحد فقط: نستخدم old_buy_price
-            price24hAgo = Number(records[0].old_buy_price) || 0;
-          } else if (records.length >= 2) {
-            // سجلان أو أكثر: نستخدم new_buy_price من السجل الثاني (قبل الأخير)
-            price24hAgo = Number(records[1].new_buy_price) || Number(records[1].old_buy_price) || 0;
+          // البحث عن أول سجل في التاريخ حيث السعر مختلف عن السعر الحالي
+          // نبحث عن new_buy_price أو old_buy_price مختلف عن currentPrice
+          let foundPrice = 0;
+          
+          for (let i = 0; i < records.length; i++) {
+            const record = records[i];
+            const recordNewPrice = Number(record.new_buy_price) || 0;
+            const recordOldPrice = Number(record.old_buy_price) || 0;
+            
+            // نستخدم new_buy_price إذا كان مختلفاً عن السعر الحالي
+            if (recordNewPrice > 0 && Math.abs(recordNewPrice - currentPrice) > 0.01) {
+              foundPrice = recordNewPrice;
+              break;
+            }
+            
+            // إذا لم نجد، نستخدم old_buy_price إذا كان مختلفاً
+            if (recordOldPrice > 0 && Math.abs(recordOldPrice - currentPrice) > 0.01) {
+              foundPrice = recordOldPrice;
+              break;
+            }
           }
           
-          // إذا لم نجد سعر مرجعي، نستخدم old_buy_price من آخر سجل
-          if (price24hAgo === 0 && records.length > 0) {
-            price24hAgo = Number(records[0].old_buy_price) || 0;
+          // إذا لم نجد سعر مختلف، نستخدم old_buy_price من آخر سجل
+          if (foundPrice === 0 && records.length > 0) {
+            foundPrice = Number(records[0].old_buy_price) || 0;
+          }
+          
+          price24hAgo = foundPrice;
+        }
+        
+        // فقط إذا لم نجد أي سعر مرجعي من last_actual_purchase_price أو exchange_price_history
+        // نستخدم base_price كحل أخير (لكن فقط إذا كان مختلفاً عن السعر الحالي)
+        if (price24hAgo === 0 || Math.abs(price24hAgo - currentPrice) < 0.01) {
+          const basePrice = basePricesMap.get(stockExchangeId) || 0;
+          // نستخدم base_price فقط إذا كان مختلفاً عن السعر الحالي
+          if (basePrice > 0 && Math.abs(basePrice - currentPrice) > 0.01) {
+            price24hAgo = basePrice;
           }
         }
         

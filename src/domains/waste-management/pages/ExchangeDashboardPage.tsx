@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { fetchPrices, updateExchangeProduct } from '../store/exchangeSlice';
@@ -84,12 +84,22 @@ const ExchangeDashboardPage: React.FC = () => {
   }, [dispatch]);
   
   // تحديث trends عند تغيير prices
+  // استخدام useMemo لإنشاء key من prices لتتبع التغييرات
+  const pricesKey = useMemo(() => {
+    return prices.map(p => `${p.id}-${p.buy_price}-${p.last_update}`).join('|');
+  }, [prices]);
+  
   useEffect(() => {
     if (prices.length > 0) {
-      // إضافة delay صغير لضمان تحديث البيانات في قاعدة البيانات
-      const timeoutId = setTimeout(() => {
-        exchangeService.getMarketTrends().then(data => {
-          if (data) {
+      // إضافة delay لضمان تحديث البيانات في قاعدة البيانات
+      // نستخدم retry mechanism للتأكد من جلب أحدث البيانات
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      const fetchTrends = async () => {
+        try {
+          const data = await exchangeService.getMarketTrends();
+          if (data && data.length > 0) {
             setTrends(data);
             console.log("📊 تم تحديث trends بعد تغيير prices:", {
               trendsCount: data.length,
@@ -98,14 +108,28 @@ const ExchangeDashboardPage: React.FC = () => {
               pricesIds: prices.map(p => ({ id: p.id, product_id: p.product_id }))
             });
           } else {
-            console.log("⚠️ لا توجد trends متاحة");
+            // إذا لم تكن هناك trends، نحاول مرة أخرى بعد delay
+            if (retryCount < maxRetries) {
+              retryCount++;
+              setTimeout(fetchTrends, 500);
+            } else {
+              console.log("⚠️ لا توجد trends متاحة بعد عدة محاولات");
+            }
           }
-        });
-      }, 500);
+        } catch (error) {
+          console.error("❌ خطأ في جلب trends:", error);
+          if (retryCount < maxRetries) {
+            retryCount++;
+            setTimeout(fetchTrends, 500);
+          }
+        }
+      };
+      
+      const timeoutId = setTimeout(fetchTrends, 1500); // زيادة delay لضمان تحديث البيانات في قاعدة البيانات
       
       return () => clearTimeout(timeoutId);
     }
-  }, [prices.length]); // تحديث عند تغيير عدد الأسعار (لتجنب re-render مفرط)
+  }, [pricesKey, prices.length]); // تحديث عند تغيير pricesKey (يتضمن تغييرات في buy_price)
 
 
 
@@ -185,13 +209,10 @@ const ExchangeDashboardPage: React.FC = () => {
         })).unwrap();
         
         // تحديث trends بعد التحديث
+        // trends سيتم تحديثها تلقائياً من useEffect عند تغيير pricesKey
         setTimeout(async () => {
           await dispatch(fetchPrices());
-          const trendsData = await exchangeService.getMarketTrends();
-          if (trendsData) {
-            setTrends(trendsData);
-            console.log("✅ تم تحديث trends بعد حفظ السعر:", trendsData);
-          }
+          // trends سيتم تحديثها تلقائياً من useEffect
         }, 1000);
         
         toast.success('تم تحديث سعر المادة بنجاح');
@@ -376,18 +397,8 @@ const ExchangeDashboardPage: React.FC = () => {
       // 3. Refresh data to ensure sync
       await dispatch(fetchPrices());
       
-      // 4. تحديث trends بعد التحديث (مع delay لضمان تحديث البيانات في قاعدة البيانات)
-      setTimeout(async () => {
-        const trendsData = await exchangeService.getMarketTrends();
-        if (trendsData) {
-          setTrends(trendsData);
-          console.log("✅ تم تحديث trends بعد التعديل:", {
-            trendsCount: trendsData.length,
-            trends: trendsData,
-            updatedItemId: editingItem.id
-          });
-        }
-      }, 1000);
+      // 4. trends سيتم تحديثها تلقائياً من useEffect عند تغيير pricesKey
+      // لا حاجة لتحديث يدوي هنا - useEffect سيتولى ذلك بعد fetchPrices()
       
       setEditingItem(null);
 
@@ -740,8 +751,9 @@ const ExchangeDashboardPage: React.FC = () => {
                                 price24hAgo = Number(trend.price_24h_ago) || 0;
                               }
                               
-                              // إذا لم يكن هناك trend أو price_24h_ago = 0، نستخدم base_price كسعر مرجعي
-                              if (price24hAgo === 0 && basePrice > 0) {
+                              // إذا لم يكن هناك trend أو price_24h_ago = 0 أو يساوي السعر الحالي
+                              // نستخدم base_price كسعر مرجعي فقط إذا كان مختلفاً عن السعر الحالي
+                              if ((price24hAgo === 0 || price24hAgo === buyPrice) && basePrice > 0 && basePrice !== buyPrice) {
                                 price24hAgo = basePrice;
                               }
                               
