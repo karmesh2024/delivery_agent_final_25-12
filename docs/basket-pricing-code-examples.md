@@ -401,3 +401,10 @@ export function BasketPricePreview({ basketId }: { basketId: string }) {
 3. **الحد الأدنى**: يجب إعداد `minimum_weight_per_category` في `basket_config` قبل السماح بالشحن
 4. **الحساب**: `price = (buy_price * weight) / 1000` حيث `weight` بالجرام
 
+
+
+
+
+
+
+

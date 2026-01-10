@@ -237,3 +237,10 @@ const { data: products } = await supabase
 3. تحديث API التطبيق لاستخدام `catalog_waste_materials`
 4. تحديث واجهة التطبيق لعرض الفئات من كتالوج المخازن
 
+
+
+
+
+
+
+
