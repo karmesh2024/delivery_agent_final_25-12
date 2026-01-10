@@ -135,7 +135,7 @@ export default function PriceApprovalsPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-800">طلبات الموافقة على تغيير الأسعار</h1>
             <p className="text-gray-500 mt-2">
-              مراجعة والموافقة على تغييرات الأسعار الكبيرة (>= 10%)
+              مراجعة والموافقة على تغييرات الأسعار الكبيرة (&gt;= 10%)
             </p>
           </div>
           <Button onClick={loadRequests} variant="outline">
