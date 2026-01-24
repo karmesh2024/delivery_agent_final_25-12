@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
@@ -28,22 +28,33 @@ import { radioContentService, RadioContent, ContentType, MediaType } from '../se
 import { visualAdsService } from '../services/visualAdsService';
 import { toast } from 'react-toastify';
 
+interface VisualAd {
+  id: string;
+  title: string;
+  media_type: 'image' | 'video';
+  file_duration_seconds?: number;
+  display_duration_seconds?: number;
+  description?: string;
+  play_rule?: 'every_30_minutes' | 'hourly' | 'daily' | 'once' | 'continuous';
+  scheduled_time?: string;
+}
+
 interface ContentLibraryProps {
-  onContentSelect?: (content: RadioContent | any) => void;
+  onContentSelect?: (content: RadioContent | VisualAd) => void;
   selectedContentIds?: string[];
   showVisualAds?: boolean;
 }
 
-export function ContentLibrary({ onContentSelect, selectedContentIds = [], showVisualAds = false }: ContentLibraryProps) {
+export function ContentLibrary({ onContentSelect, selectedContentIds = [], showVisualAds: initialShowVisualAds = false }: ContentLibraryProps) {
   const [content, setContent] = useState<RadioContent[]>([]);
-  const [visualAds, setVisualAds] = useState<any[]>([]);
+  const [visualAds, setVisualAds] = useState<VisualAd[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<ContentType | 'all'>('all');
-  const [showVisualAds, setShowVisualAds] = useState(false);
+  const [showVisualAds, setShowVisualAds] = useState(initialShowVisualAds);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [editingContent, setEditingContent] = useState<RadioContent | null>(null);
+  const [editingContent, setEditingContent] = useState<RadioContent | VisualAd | null>(null);
 
   // Upload form state
   const [uploadForm, setUploadForm] = useState({
@@ -61,11 +72,12 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [], showV
     display_duration_seconds: 10,
   });
 
+  // تحديث showVisualAds عند تغيير الـ prop
   useEffect(() => {
-    loadContent();
-  }, [filterType, searchQuery, showVisualAds]);
+    setShowVisualAds(initialShowVisualAds);
+  }, [initialShowVisualAds]);
 
-  const loadContent = async () => {
+  const loadContent = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -106,11 +118,20 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [], showV
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterType, searchQuery, showVisualAds]);
+
+  useEffect(() => {
+    loadContent();
+  }, [loadContent]);
 
   const handleUpload = async () => {
-    if (!uploadForm.file || !uploadForm.title) {
-      toast.error('يرجى إدخال العنوان واختيار ملف');
+    if (!uploadForm.file) {
+      toast.error('يرجى اختيار ملف للرفع');
+      return;
+    }
+
+    if (!uploadForm.title.trim()) {
+      toast.error('يرجى إدخال عنوان للمحتوى');
       return;
     }
 
@@ -125,18 +146,29 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [], showV
         (uploadForm.media_type === 'image' && fileType.startsWith('image/'));
 
       if (!isValidType) {
-        toast.error(`نوع الملف غير صحيح. يرجى اختيار ملف ${uploadForm.media_type}`);
+        const mediaTypeLabels: Record<MediaType, string> = {
+          audio: 'صوتي',
+          video: 'فيديو',
+          image: 'صورة'
+        };
+        toast.error(`نوع الملف غير صحيح. يرجى اختيار ملف ${mediaTypeLabels[uploadForm.media_type]}`);
         return;
       }
 
-      if (uploadForm.content_type === 'visual_ad') {
+      if (uploadForm.content_type === 'visual_ad' && uploadForm.file) {
+        // التحقق من الحقول المطلوبة للإعلانات المرئية
+        if (uploadForm.media_type === 'image' && (!uploadForm.display_duration_seconds || uploadForm.display_duration_seconds < 5)) {
+          toast.error('مدة العرض يجب أن تكون 5 ثواني على الأقل');
+          return;
+        }
+
         // رفع إعلان مرئي
-        const metadata: any = {
+        const metadata: Record<string, any> = {
           priority: uploadForm.priority,
         };
 
         if (uploadForm.tags) {
-          metadata.tags = uploadForm.tags.split(',').map(t => t.trim());
+          metadata.tags = uploadForm.tags.split(',').map(t => t.trim()).filter(Boolean);
         }
 
         if (uploadForm.media_type === 'image') {
@@ -148,7 +180,7 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [], showV
           uploadForm.title,
           uploadForm.media_type as 'image' | 'video',
           {
-            description: uploadForm.description,
+            description: uploadForm.description || undefined,
             playRule: uploadForm.play_rule,
             scheduledTime: uploadForm.scheduled_time || undefined,
             priority: uploadForm.priority,
@@ -158,15 +190,15 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [], showV
         );
 
         toast.success('تم رفع الإعلان المرئي بنجاح');
-      } else {
+      } else if (uploadForm.file) {
         // رفع محتوى صوتي عادي
-        const metadata: any = {
+        const metadata: Record<string, any> = {
           priority: uploadForm.priority,
           allow_music_overlay: uploadForm.allow_music_overlay,
         };
 
         if (uploadForm.tags) {
-          metadata.tags = uploadForm.tags.split(',').map(t => t.trim());
+          metadata.tags = uploadForm.tags.split(',').map(t => t.trim()).filter(Boolean);
         }
 
         await radioContentService.uploadContent(
@@ -193,17 +225,19 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [], showV
         scheduled_time: '',
         display_duration_seconds: 10,
       });
-      loadContent();
+      await loadContent();
     } catch (error) {
       console.error('Error uploading content:', error);
-      toast.error('حدث خطأ أثناء رفع المحتوى');
+      const errorMessage = error instanceof Error ? error.message : 'حدث خطأ غير معروف';
+      toast.error(`حدث خطأ أثناء رفع المحتوى: ${errorMessage}`);
     } finally {
       setUploading(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(`هل أنت متأكد من حذف ${showVisualAds ? 'هذا الإعلان المرئي' : 'هذا المحتوى'}؟`)) {
+    const itemType = showVisualAds ? 'هذا الإعلان المرئي' : 'هذا المحتوى';
+    if (!window.confirm(`هل أنت متأكد من حذف ${itemType}؟`)) {
       return;
     }
 
@@ -215,10 +249,11 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [], showV
         await radioContentService.deleteContent(id);
         toast.success('تم حذف المحتوى بنجاح');
       }
-      loadContent();
+      await loadContent();
     } catch (error) {
       console.error('Error deleting content:', error);
-      toast.error('حدث خطأ أثناء حذف المحتوى');
+      const errorMessage = error instanceof Error ? error.message : 'حدث خطأ غير معروف';
+      toast.error(`حدث خطأ أثناء حذف المحتوى: ${errorMessage}`);
     }
   };
 
@@ -258,19 +293,22 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [], showV
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const filteredContent = content.filter(item => {
-    if (searchQuery && !item.title.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
-    return true;
-  });
+  // استخدام useMemo لتحسين الأداء
+  const filteredContent = useMemo(() => {
+    if (!searchQuery) return content;
+    const query = searchQuery.toLowerCase();
+    return content.filter(item => 
+      item.title.toLowerCase().includes(query)
+    );
+  }, [content, searchQuery]);
 
-  const filteredVisualAds = visualAds.filter(item => {
-    if (searchQuery && !item.title.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
-    return true;
-  });
+  const filteredVisualAds = useMemo(() => {
+    if (!searchQuery) return visualAds;
+    const query = searchQuery.toLowerCase();
+    return visualAds.filter(item => 
+      item.title.toLowerCase().includes(query)
+    );
+  }, [visualAds, searchQuery]);
 
   return (
     <div className="space-y-4">
@@ -577,7 +615,9 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [], showV
                   <Label>قاعدة العرض</Label>
                   <Select
                     value={uploadForm.play_rule}
-                    onValueChange={(value: any) => setUploadForm({ ...uploadForm, play_rule: value })}
+                    onValueChange={(value: 'every_30_minutes' | 'hourly' | 'daily' | 'once' | 'continuous') => 
+                      setUploadForm({ ...uploadForm, play_rule: value })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -611,7 +651,12 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [], showV
                       min="5"
                       max="60"
                       value={uploadForm.display_duration_seconds}
-                      onChange={(e) => setUploadForm({ ...uploadForm, display_duration_seconds: parseInt(e.target.value) })}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value, 10);
+                        if (!isNaN(value) && value >= 5 && value <= 60) {
+                          setUploadForm({ ...uploadForm, display_duration_seconds: value });
+                        }
+                      }}
                     />
                   </div>
                 )}
@@ -641,7 +686,9 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [], showV
               <Label>الأولوية</Label>
               <Select
                 value={uploadForm.priority}
-                onValueChange={(value) => setUploadForm({ ...uploadForm, priority: value as any })}
+                onValueChange={(value: 'low' | 'medium' | 'high') => 
+                  setUploadForm({ ...uploadForm, priority: value })
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
