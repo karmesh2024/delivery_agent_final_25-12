@@ -30,7 +30,9 @@ import {
   FiShoppingCart,
   FiBriefcase,
   FiClipboard,
-  FiCheckCircle
+  FiCheckCircle,
+  FiAward,
+  FiRadio
 } from "react-icons/fi";
 
 // مكون للتأكد من أن المحتوى يظهر فقط بعد اكتمال الهيدريشن
@@ -67,6 +69,8 @@ export function Sidebar() {
     { name: "Customers", href: "/customers", icon: FiUser },
     { name: "العملاء غير المسجلين", href: "/unregistered-customers", icon: FiUsers },
     { name: "الإدارة المالية", href: "/financial-management", icon: FiDollarSign },
+    { name: "إدارة النقاط", href: "/financial-management/points", icon: FiTag },
+    { name: "نادي Scope Zone", href: "/club-zone", icon: FiAward },
     { name: "إدارة المخازن", href: "/warehouse-management", icon: FiPackage },
     { name: "إدارة الموردين", href: "/supplier-management", icon: FiShoppingBag },
     { name: "إدارة المخلفات", href: "/waste-management", icon: FiPackage },

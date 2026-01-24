@@ -24,6 +24,8 @@ import approvedAgentsReducer from "@/domains/approved-agents/store/approvedAgent
 import storeOrdersReducer from "@/domains/store-orders/store/storeOrdersSlice";
 import purchasingReducer from "@/domains/purchasing/store/purchasingSlice";
 import industrialPartnersReducer from "../domains/waste-management/partners/store/industrialPartnersSlice";
+import pointsReducer from "@/domains/financial-management/points/store/pointsSlice";
+import clubZoneReducer from "@/domains/club-zone/store/clubZoneSlice";
 
 export const store = configureStore({
   reducer: {
@@ -52,6 +54,8 @@ export const store = configureStore({
     storeOrders: storeOrdersReducer,
     purchasing: purchasingReducer,
     industrialPartners: industrialPartnersReducer,
+    points: pointsReducer,
+    clubZone: clubZoneReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

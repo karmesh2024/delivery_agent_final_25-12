@@ -4,7 +4,7 @@ import React from 'react';
 import { DashboardLayout } from '@/shared/layouts/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
-import { FiDollarSign, FiTrendingUp, FiPieChart, FiFileText, FiTarget, FiShoppingBag } from "react-icons/fi";
+import { FiDollarSign, FiTrendingUp, FiPieChart, FiFileText, FiTarget, FiShoppingBag, FiTag } from "react-icons/fi";
 import Link from "next/link";
 
 export default function FinancialManagement() {
@@ -148,6 +148,29 @@ export default function FinancialManagement() {
               <Link href="/financial-management/pricing-management">
                 <Button className="w-full">
                   إدارة التسعير
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* بطاقة إدارة النقاط */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center text-xl">
+                <FiTag className="mr-2 text-indigo-500" />
+                إدارة النقاط
+              </CardTitle>
+              <CardDescription>
+                إدارة نظام النقاط والمكافآت للعملاء
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-4">
+                إعدادات النقاط، التسعير، المعاملات والتقارير الشاملة.
+              </p>
+              <Link href="/financial-management/points">
+                <Button className="w-full">
+                  إدارة النقاط
                 </Button>
               </Link>
             </CardContent>

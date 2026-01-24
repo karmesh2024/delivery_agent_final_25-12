@@ -19,14 +19,18 @@ export function useLeafletMap(options: {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // @ts-expect-error - _getIconUrl غير معرّف في أنواط TypeScript
-    delete L.Icon.Default.prototype._getIconUrl;
-    
-    L.Icon.Default.mergeOptions({
-      iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-      iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
-      shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
-    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const LeafletIcon = (L as any).Icon;
+    if (LeafletIcon && LeafletIcon.Default) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (LeafletIcon.Default.prototype as any)._getIconUrl;
+      
+      LeafletIcon.Default.mergeOptions({
+        iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+      });
+    }
   }, []);
 
   // تهيئة الخريطة عند تركيب المكون
@@ -57,19 +61,22 @@ export function useLeafletMap(options: {
       
       try {
         // تهيئة الخريطة مع الخيارات المطلوبة
-        const map = L.map(container, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const map = (L as any).map(container, {
           center,
           zoom,
           zoomControl: false,
         });
 
         // إضافة طبقة OpenStreetMap
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (L as any).tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
         // إضافة عناصر التحكم
-        L.control.zoom({ position: 'topright' }).addTo(map);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (L as any).control.zoom({ position: 'topright' }).addTo(map);
 
         // حفظ مرجع الخريطة
         mapRef.current = map;
@@ -86,13 +93,16 @@ export function useLeafletMap(options: {
       clearTimeout(timeoutId);
       if (mapRef.current) {
         console.log(`Removing Leaflet map with ID: ${id}`);
-        mapRef.current.remove();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (mapRef.current as any).remove();
         mapRef.current = null;
         setIsMapReady(false);
       }
       initializingRef.current = false;
     };
-  }, [center, zoom, id]);
+    // ✅ FIX: استخدام id فقط كـ dependency - center و zoom يتم تحديثهما عبر map.setView() بدلاً من إعادة الإنشاء
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]); // فقط id - center و zoom لا يجب أن يسببا إعادة إنشاء
 
   return {
     containerRef,

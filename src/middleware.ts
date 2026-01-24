@@ -276,7 +276,15 @@ async function validateInput(
       return null;
     }
 
-    // فحص المحتوى
+    const contentLength = request.headers.get('content-length');
+    const hasBody = contentLength && parseInt(contentLength, 10) > 0;
+
+    // طلبات بدون body (مثل توليد M3U، Cron، تفعيل إجراء) — لا نطبق فحص Content-Type
+    if (!hasBody) {
+      return null;
+    }
+
+    // فحص المحتوى عند وجود body
     const contentType = request.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       return NextResponse.json(
@@ -285,9 +293,8 @@ async function validateInput(
       );
     }
 
-    // فحص حجم الطلب
-    const contentLength = request.headers.get('content-length');
-    if (contentLength && parseInt(contentLength) > 10 * 1024 * 1024) { // 10MB
+    // فحص حجم الطلب (10MB)
+    if (parseInt(contentLength!, 10) > 10 * 1024 * 1024) {
       return NextResponse.json(
         { error: 'حجم الطلب كبير جداً' },
         { status: 413 }

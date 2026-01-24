@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useLeafletMap } from '../hooks/useLeafletMap';
 import L from 'leaflet';
 import { Agent } from "@/types";
@@ -86,6 +86,21 @@ export function LeafletMap({
   const [agentMarkers, setAgentMarkers] = useState<any[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [locationMarkers, setLocationMarkers] = useState<any[]>([]);
+  
+  // Refs لتخزين markers للتنظيف
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const agentMarkersRef = useRef<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const locationMarkersRef = useRef<any[]>([]);
+  
+  // تحديث refs عند تغيير markers
+  useEffect(() => {
+    agentMarkersRef.current = agentMarkers;
+  }, [agentMarkers]);
+  
+  useEffect(() => {
+    locationMarkersRef.current = locationMarkers;
+  }, [locationMarkers]);
   
   // إنشاء أيقونة للمندوب
   const createAgentIcon = useCallback((status: string) => {
@@ -205,7 +220,9 @@ export function LeafletMap({
     }
 
     // إزالة العلامات الحالية
-    agentMarkers.forEach(marker => marker.remove());
+    agentMarkersRef.current.forEach(marker => {
+      if (marker) marker.remove();
+    });
     
     // إضافة سجلات تصحيح لفحص بيانات المندوبين
     console.log(`LeafletMap (${mapId}): إجمالي المندوبين قبل التصفية: ${agents.length}`);
@@ -240,41 +257,73 @@ export function LeafletMap({
       console.log(`LeafletMap (${mapId}): لا يوجد مندوبون صالحون بعد التصفية`);
     }
     
-    // إنشاء علامات جديدة
-    const newMarkers = validAgents.map(agent => {
-      // التأكد من وجود إحداثيات صالحة
-      const lat = agent.location?.lat || 0;
-      const lng = agent.location?.lng || 0;
-      
-      try {
-        const marker = leaflet.marker(
-          [lat, lng],
-          { icon: createAgentIcon(agent.status || 'offline') }
-        ).addTo(mapInstance);
-
-        // إضافة مربع منبثق
-        marker.bindPopup(createAgentPopupContent(agent), { closeButton: true });
-
-        // إضافة معالج النقر
-        marker.on('click', () => {
-          setSelectedAgent(prevAgent => prevAgent?.id === agent.id ? null : agent);
-          setSelectedLocation(null);
-          if (onAgentClick) onAgentClick(agent);
-        });
-
-        return marker;
-      } catch (error) {
-        console.error(`LeafletMap (${mapId}): خطأ في إنشاء علامة للمندوب ${agent.id}:`, error);
-        return null;
-      }
+    // انتظر حتى تكون الخريطة جاهزة تماماً قبل إضافة markers
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }).filter(Boolean) as any[]; // استبعاد العلامات التي فشل إنشاؤها
+    (mapInstance as any).whenReady(() => {
+      // استخدام requestAnimationFrame لضمان أن DOM جاهز تماماً
+      requestAnimationFrame(() => {
+        // تأخير إضافي لضمان أن map container موجود في DOM
+        setTimeout(() => {
+          // التحقق من أن الخريطة لا تزال موجودة وجاهزة
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (!mapInstance || !(mapInstance as any).getContainer()) {
+            console.warn(`LeafletMap (${mapId}): الخريطة غير جاهزة لإضافة markers`);
+            return;
+          }
 
-    setAgentMarkers(newMarkers);
+          // التحقق من أن map container موجود في DOM
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const container = (mapInstance as any).getContainer();
+          if (!container || !container.parentElement) {
+            console.warn(`LeafletMap (${mapId}): حاوية الخريطة غير موجودة في DOM`);
+            return;
+          }
+
+          // التحقق من أن map panes موجودة (مطلوبة لإضافة markers)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (!(mapInstance as any).getPane('markerPane')) {
+            console.warn(`LeafletMap (${mapId}): markerPane غير جاهز`);
+            return;
+          }
+
+          // إنشاء علامات جديدة
+          const newMarkers = validAgents.map(agent => {
+            // التأكد من وجود إحداثيات صالحة
+            const lat = agent.location?.lat || 0;
+            const lng = agent.location?.lng || 0;
+            
+            try {
+              const marker = leaflet.marker(
+                [lat, lng],
+                { icon: createAgentIcon(agent.status || 'offline') }
+              ).addTo(mapInstance);
+
+              // إضافة مربع منبثق
+              marker.bindPopup(createAgentPopupContent(agent), { closeButton: true });
+
+              // إضافة معالج النقر
+              marker.on('click', () => {
+                setSelectedAgent(prevAgent => prevAgent?.id === agent.id ? null : agent);
+                setSelectedLocation(null);
+                if (onAgentClick) onAgentClick(agent);
+              });
+
+              return marker;
+            } catch (error) {
+              console.error(`LeafletMap (${mapId}): خطأ في إنشاء علامة للمندوب ${agent.id}:`, error);
+              return null;
+            }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          }).filter(Boolean) as any[]; // استبعاد العلامات التي فشل إنشاؤها
+
+          setAgentMarkers(newMarkers);
+        }, 150); // تأخير 150ms بعد requestAnimationFrame
+      });
+    });
 
     // تنظيف عند إزالة المكون
     return () => {
-      newMarkers.forEach(marker => {
+      agentMarkersRef.current.forEach(marker => {
         if (marker) marker.remove();
       });
     };
@@ -287,7 +336,9 @@ export function LeafletMap({
     }
 
     // إزالة العلامات الحالية
-    locationMarkers.forEach(marker => marker.remove());
+    locationMarkersRef.current.forEach(marker => {
+      if (marker) marker.remove();
+    });
     
     // تصفية المواقع ذات الإحداثيات الصالحة
     const validLocations = locations.filter(location => 
@@ -297,38 +348,89 @@ export function LeafletMap({
       location.lng !== 0
     );
     
-    // إنشاء علامات جديدة
-    const newMarkers = validLocations.map(location => {
-      const marker = leaflet.marker(
-        [location.lat, location.lng],
-        { icon: createLocationIcon(location.status || 'unknown') }
-      ).addTo(mapInstance);
+    // انتظر حتى تكون الخريطة جاهزة تماماً قبل إضافة markers
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (mapInstance as any).whenReady(() => {
+      // استخدام requestAnimationFrame لضمان أن DOM جاهز تماماً
+      requestAnimationFrame(() => {
+        // تأخير إضافي لضمان أن map container موجود في DOM
+        setTimeout(() => {
+          // التحقق من أن الخريطة لا تزال موجودة وجاهزة
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (!mapInstance || !(mapInstance as any).getContainer()) {
+            console.warn(`LeafletMap (${mapId}): الخريطة غير جاهزة لإضافة markers`);
+            return;
+          }
 
-      // إضافة مربع منبثق
-      marker.bindPopup(createLocationPopupContent(location), { closeButton: true });
+          // التحقق من أن map container موجود في DOM
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const container = (mapInstance as any).getContainer();
+          if (!container || !container.parentElement) {
+            console.warn(`LeafletMap (${mapId}): حاوية الخريطة غير موجودة في DOM`);
+            return;
+          }
 
-      // إضافة معالج النقر
-      marker.on('click', () => {
-        setSelectedLocation(prevLocation => prevLocation?.id === location.id ? null : location);
-        setSelectedAgent(null);
-        if (onLocationClick) onLocationClick(location);
+          // التحقق من أن map panes موجودة (مطلوبة لإضافة markers)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (!(mapInstance as any).getPane('markerPane')) {
+            console.warn(`LeafletMap (${mapId}): markerPane غير جاهز`);
+            return;
+          }
+
+          // إنشاء علامات جديدة
+          const newMarkers = validLocations.map(location => {
+            try {
+              const marker = leaflet.marker(
+                [location.lat, location.lng],
+                { icon: createLocationIcon(location.status || 'unknown') }
+              ).addTo(mapInstance);
+
+              // إضافة مربع منبثق
+              marker.bindPopup(createLocationPopupContent(location), { closeButton: true });
+
+              // إضافة معالج النقر
+              marker.on('click', () => {
+                setSelectedLocation(prevLocation => prevLocation?.id === location.id ? null : location);
+                setSelectedAgent(null);
+                if (onLocationClick) onLocationClick(location);
+              });
+
+              return marker;
+            } catch (error) {
+              console.error(`LeafletMap (${mapId}): خطأ في إنشاء علامة للموقع ${location.id}:`, error);
+              return null;
+            }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }).filter(Boolean) as any[];
+
+          setLocationMarkers(newMarkers);
+        }, 150); // تأخير 150ms بعد requestAnimationFrame
       });
-
-      return marker;
     });
-
-    setLocationMarkers(newMarkers);
 
     // تنظيف عند إزالة المكون
     return () => {
-      newMarkers.forEach(marker => {
-        marker.remove();
+      locationMarkersRef.current.forEach(marker => {
+        if (marker) marker.remove();
       });
     };
-  }, [mapInstance, isMapReady, locations, createLocationIcon, onLocationClick, createLocationPopupContent, showAgentsOnly]);
+  }, [mapInstance, isMapReady, locations, createLocationIcon, onLocationClick, createLocationPopupContent, showAgentsOnly, mapId]);
 
-  // سجل تصحيح عند تلقي البيانات
+  // ✅ FIX: تحديث center و zoom بدون إعادة إنشاء الخريطة
   useEffect(() => {
+    if (mapInstance && isMapReady) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (mapInstance as any).setView(center, zoom, { animate: false });
+    }
+  }, [mapInstance, isMapReady, center, zoom]);
+
+  // سجل تصحيح عند تلقي البيانات (فقط عند تغيير البيانات فعلياً)
+  const prevAgentsRef = useRef<string>('');
+  useEffect(() => {
+    const agentsKey = JSON.stringify(agents.map(a => ({ id: a.id, hasLocation: !!a.location })));
+    if (agentsKey === prevAgentsRef.current) return; // لا تسجل إذا لم تتغير البيانات
+    
+    prevAgentsRef.current = agentsKey;
     console.log(`LeafletMap (${mapId}): تم استلام المندوبين:`, agents.length);
     console.log(`LeafletMap (${mapId}): المندوبون بمواقع صالحة:`, agents.filter(a => a.location).length);
     
@@ -337,7 +439,7 @@ export function LeafletMap({
       console.log(`LeafletMap (${mapId}): تحديث علامات المندوبين بعد تغيير البيانات`);
       
       // إزالة العلامات الحالية
-      agentMarkers.forEach(marker => {
+      agentMarkersRef.current.forEach(marker => {
         if (marker) marker.remove();
       });
       

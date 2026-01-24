@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/playlist-engine/generate-m3u",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/playlist-engine/scheduled-ads",
+      "schedule": "* * * * *"
+    }
+  ]
+}
