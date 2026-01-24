@@ -26,6 +26,7 @@ import {
 import Link from 'next/link';
 import { ContentLibrary } from '@/domains/club-zone/components/ContentLibrary';
 import { TimelineEditor } from '@/domains/club-zone/components/TimelineEditor';
+import { VisualAdsPlayer } from '@/domains/club-zone/components/VisualAdsPlayer';
 import { autoSwitchService } from '@/domains/club-zone/services/autoSwitchService';
 import { playlistEngineService } from '@/domains/club-zone/services/playlistEngineService';
 import { toast } from 'react-toastify';
@@ -70,6 +71,7 @@ export default function AlwaysOnPage() {
   const [icecastUrl, setIcecastUrl] = useState('http://radio.karmesh.eg:8000/stream');
   const [activityId, setActivityId] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const [showVisualAdsPlayer, setShowVisualAdsPlayer] = useState(false);
 
   useEffect(() => {
     loadStatus();
@@ -200,9 +202,19 @@ export default function AlwaysOnPage() {
         </Button>
 
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">البث العام المستمر</h1>
-          <p className="text-gray-500">إدارة البث المستمر 24/7</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">البث العام المستمر</h1>
+            <p className="text-gray-500">إدارة البث المستمر 24/7</p>
+          </div>
+          <Button
+            onClick={() => setShowVisualAdsPlayer(true)}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <FiVideo className="w-4 h-4" />
+            عرض إعلان مرئي
+          </Button>
         </div>
 
         {/* Status Panel */}
@@ -486,6 +498,20 @@ export default function AlwaysOnPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Visual Ads Player */}
+      <VisualAdsPlayer
+        isVisible={showVisualAdsPlayer}
+        onClose={() => setShowVisualAdsPlayer(false)}
+        onAdComplete={(ad) => {
+          console.log('Ad completed:', ad.title);
+          // يمكن إضافة منطق إضافي هنا
+        }}
+        onAdInteract={(ad, interaction) => {
+          console.log('Ad interaction:', ad.title, interaction);
+          // يمكن إضافة منطق إضافي هنا
+        }}
+      />
     </DashboardLayout>
   );
 }

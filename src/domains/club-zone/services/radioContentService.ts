@@ -5,8 +5,9 @@
 
 import { supabase } from '@/lib/supabase';
 
-export type ContentType = 'clip' | 'music' | 'ad' | 'announcement';
+export type ContentType = 'clip' | 'music' | 'ad' | 'announcement' | 'visual_ad';
 export type ContentPriority = 'low' | 'medium' | 'high';
+export type MediaType = 'audio' | 'video' | 'image';
 
 /**
  * حساب مدة الملف الصوتي باستخدام Web Audio API
@@ -14,44 +15,64 @@ export type ContentPriority = 'low' | 'medium' | 'high';
  * @returns مدة الملف بالثواني
  */
 export async function calculateAudioDuration(file: File): Promise<number> {
+  return calculateMediaDuration(file, 'audio');
+}
+
+/**
+ * حساب مدة الفيديو
+ * @param file الملف الفيديو
+ * @returns مدة الملف بالثواني
+ */
+export async function calculateVideoDuration(file: File): Promise<number> {
+  return calculateMediaDuration(file, 'video');
+}
+
+/**
+ * حساب مدة الملف الوسائطي (صوت أو فيديو)
+ * @param file الملف
+ * @param mediaType نوع الوسيطة
+ * @returns مدة الملف بالثواني
+ */
+export async function calculateMediaDuration(file: File, mediaType: MediaType): Promise<number> {
   return new Promise((resolve, reject) => {
-    // التحقق من أن الملف صوتي
-    if (!file.type.startsWith('audio/')) {
-      console.warn('[Audio Duration] File is not an audio file:', file.type);
+    // التحقق من نوع الملف
+    const expectedPrefix = mediaType === 'audio' ? 'audio/' : 'video/';
+    if (!file.type.startsWith(expectedPrefix)) {
+      console.warn(`[${mediaType} Duration] File is not a ${mediaType} file:`, file.type);
       resolve(0);
       return;
     }
 
     try {
-      // إنشاء عنصر Audio
-      const audio = new Audio();
+      // إنشاء عنصر الوسيطة المناسب
+      const media = mediaType === 'audio' ? new Audio() : document.createElement('video');
       const objectUrl = URL.createObjectURL(file);
 
-      audio.addEventListener('loadedmetadata', () => {
-        const duration = Math.round(audio.duration);
+      media.addEventListener('loadedmetadata', () => {
+        const duration = Math.round(media.duration);
         URL.revokeObjectURL(objectUrl);
-        console.log('[Audio Duration] Calculated duration:', duration, 'seconds');
+        console.log(`[${mediaType} Duration] Calculated duration:`, duration, 'seconds');
         resolve(duration);
       });
 
-      audio.addEventListener('error', (e) => {
+      media.addEventListener('error', (e) => {
         URL.revokeObjectURL(objectUrl);
-        console.error('[Audio Duration] Error loading audio:', e);
+        console.error(`[${mediaType} Duration] Error loading ${mediaType}:`, e);
         resolve(0); // نرجع 0 بدلاً من رفض الوعد
       });
 
       // تحميل الملف
-      audio.src = objectUrl;
-      audio.load();
+      media.src = objectUrl;
+      media.load();
 
       // Timeout بعد 30 ثانية
       setTimeout(() => {
         URL.revokeObjectURL(objectUrl);
-        console.warn('[Audio Duration] Timeout calculating duration');
+        console.warn(`[${mediaType} Duration] Timeout calculating duration`);
         resolve(0);
       }, 30000);
     } catch (error) {
-      console.error('[Audio Duration] Error:', error);
+      console.error(`[${mediaType} Duration] Error:`, error);
       resolve(0);
     }
   });
@@ -59,36 +80,112 @@ export async function calculateAudioDuration(file: File): Promise<number> {
 
 /**
  * حساب مدة الملف من URL
- * @param url رابط الملف الصوتي
+ * @param url رابط الملف الصوتي أو الفيديو
  * @returns مدة الملف بالثواني
  */
-export async function calculateAudioDurationFromUrl(url: string): Promise<number> {
+export async function calculateMediaDurationFromUrl(url: string, mediaType: MediaType): Promise<number> {
   return new Promise((resolve) => {
     try {
-      const audio = new Audio();
-      
-      audio.addEventListener('loadedmetadata', () => {
-        const duration = Math.round(audio.duration);
-        console.log('[Audio Duration URL] Calculated duration:', duration, 'seconds');
+      const media = mediaType === 'audio' ? new Audio() : document.createElement('video');
+
+      media.addEventListener('loadedmetadata', () => {
+        const duration = Math.round(media.duration);
+        console.log(`[${mediaType} Duration URL] Calculated duration:`, duration, 'seconds');
         resolve(duration);
       });
 
-      audio.addEventListener('error', (e) => {
-        console.error('[Audio Duration URL] Error loading audio:', e);
+      media.addEventListener('error', (e) => {
+        console.error(`[${mediaType} Duration URL] Error loading media:`, e);
         resolve(0);
       });
 
-      audio.src = url;
-      audio.load();
+      media.src = url;
+      media.load();
 
       // Timeout بعد 30 ثانية
       setTimeout(() => {
-        console.warn('[Audio Duration URL] Timeout calculating duration');
+        console.warn(`[${mediaType} Duration URL] Timeout calculating duration`);
         resolve(0);
       }, 30000);
     } catch (error) {
-      console.error('[Audio Duration URL] Error:', error);
+      console.error(`[${mediaType} Duration] Error:`, error);
       resolve(0);
+    }
+  });
+}
+
+/**
+ * حساب مدة الملف الصوتي من URL (للتوافق)
+ */
+export async function calculateAudioDurationFromUrl(url: string): Promise<number> {
+  return calculateMediaDurationFromUrl(url, 'audio');
+}
+
+/**
+ * حساب مدة الفيديو من URL
+ */
+export async function calculateVideoDurationFromUrl(url: string): Promise<number> {
+  return calculateMediaDurationFromUrl(url, 'video');
+}
+
+/**
+ * إنشاء thumbnail للفيديو
+ * @param videoFile ملف الفيديو
+ * @param time الوقت المطلوب للـ thumbnail (بالثواني)
+ * @returns base64 string للصورة
+ */
+export async function generateVideoThumbnail(videoFile: File, time: number = 1): Promise<string> {
+  return new Promise((resolve, reject) => {
+    try {
+      const video = document.createElement('video');
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'));
+        return;
+      }
+
+      const objectUrl = URL.createObjectURL(videoFile);
+
+      video.addEventListener('loadedmetadata', () => {
+        // تعيين أبعاد الـ canvas
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        // الانتقال للوقت المطلوب
+        video.currentTime = Math.min(time, video.duration);
+      });
+
+      video.addEventListener('seeked', () => {
+        // رسم الإطار على الـ canvas
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // تحويل إلى base64
+        const thumbnail = canvas.toDataURL('image/jpeg', 0.8);
+
+        // تنظيف
+        URL.revokeObjectURL(objectUrl);
+
+        resolve(thumbnail);
+      });
+
+      video.addEventListener('error', (e) => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('Error generating thumbnail'));
+      });
+
+      video.src = objectUrl;
+      video.load();
+
+      // Timeout بعد 30 ثانية
+      setTimeout(() => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('Timeout generating thumbnail'));
+      }, 30000);
+
+    } catch (error) {
+      reject(error);
     }
   });
 }
@@ -97,6 +194,7 @@ export interface RadioContent {
   id: string;
   title: string;
   content_type: ContentType;
+  media_type?: MediaType; // جديد: نوع الوسيطة
   file_url: string;
   file_duration_seconds: number;
   metadata: {
@@ -114,6 +212,7 @@ export interface RadioContent {
 export interface RadioContentFormData {
   title: string;
   content_type: ContentType;
+  media_type?: MediaType;
   file_url: string;
   file_duration_seconds: number;
   metadata?: {
@@ -124,9 +223,72 @@ export interface RadioContentFormData {
   };
 }
 
+// Visual Ads Types
+export interface VisualAd {
+  id: string;
+  title: string;
+  description?: string;
+  media_type: 'image' | 'video';
+  file_url: string;
+  file_duration_seconds?: number; // للفيديو
+  display_duration_seconds: number; // للصور (مدة العرض)
+  thumbnail_url?: string; // للفيديو
+  metadata: {
+    tags?: string[];
+    target_audience?: string[];
+    call_to_action?: string;
+    [key: string]: any;
+  };
+  play_rule?: 'every_30_minutes' | 'hourly' | 'daily' | 'once' | 'continuous';
+  scheduled_time?: string;
+  priority: ContentPriority;
+  is_active: boolean;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VisualAdFormData {
+  title: string;
+  description?: string;
+  media_type: 'image' | 'video';
+  file_url: string;
+  file_duration_seconds?: number;
+  display_duration_seconds?: number;
+  thumbnail_url?: string;
+  metadata?: {
+    tags?: string[];
+    target_audience?: string[];
+    call_to_action?: string;
+    [key: string]: any;
+  };
+  play_rule?: 'every_30_minutes' | 'hourly' | 'daily' | 'once' | 'continuous';
+  scheduled_time?: string;
+  priority?: ContentPriority;
+}
+
+export interface VisualAdLog {
+  id: string;
+  visual_ad_id: string;
+  displayed_at: string;
+  display_duration_seconds: number;
+  user_agent?: string;
+  device_info?: any;
+  location_data?: any;
+}
+
+export interface UserVisualAdInteraction {
+  id: string;
+  visual_ad_id: string;
+  user_id: string;
+  interaction_type: 'view' | 'click' | 'skip' | 'like' | 'share';
+  interaction_data?: any;
+  created_at: string;
+}
+
 export const radioContentService = {
   /**
-   * رفع ملف صوتي إلى Supabase Storage
+   * رفع ملف (صوتي أو مرئي) إلى Supabase Storage
    */
   async uploadFile(file: File, bucket: string = 'radio-content'): Promise<string> {
     const fileExt = file.name.split('.').pop();
@@ -189,22 +351,40 @@ export const radioContentService = {
     content_type: ContentType,
     metadata?: RadioContentFormData['metadata']
   ): Promise<RadioContent> {
-    // 1. حساب مدة الملف قبل الرفع
+    // تحديد نوع الوسيطة
+    let mediaType: MediaType = 'audio';
+    if (file.type.startsWith('video/')) {
+      mediaType = 'video';
+    } else if (file.type.startsWith('image/')) {
+      mediaType = 'image';
+    }
+
+    // تحديد bucket المناسب
+    const bucket = mediaType === 'audio' ? 'radio-content' : 'visual-ads';
+
+    // 1. حساب مدة الملف حسب النوع
     let fileDurationSeconds = 0;
     try {
-      fileDurationSeconds = await calculateAudioDuration(file);
-      console.log('[Radio Content] File duration calculated:', fileDurationSeconds, 'seconds');
+      if (mediaType === 'audio') {
+        fileDurationSeconds = await calculateAudioDuration(file);
+      } else if (mediaType === 'video') {
+        fileDurationSeconds = await calculateVideoDuration(file);
+      }
+      // الصور لا تحتاج مدة (تستخدم display_duration_seconds)
+
+      console.log(`[Radio Content] ${mediaType} file duration calculated:`, fileDurationSeconds, 'seconds');
     } catch (error) {
       console.warn('[Radio Content] Could not calculate duration:', error);
     }
 
     // 2. رفع الملف
-    const fileUrl = await this.uploadFile(file);
+    const fileUrl = await this.uploadFile(file, bucket);
 
     // 3. إنشاء المحتوى
     return await this.createContent({
       title,
       content_type,
+      media_type: mediaType,
       file_url: fileUrl,
       file_duration_seconds: fileDurationSeconds,
       metadata,

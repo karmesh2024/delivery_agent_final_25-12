@@ -8,7 +8,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { playlistTimelineService, CurrentPlaylistItem } from './playlistTimelineService';
-import { RadioContent } from './radioContentService';
+import { RadioContent, visualAdsService, VisualAd } from './radioContentService';
 
 export interface PlaylistEngineStatus {
   is_running: boolean;
@@ -341,6 +341,67 @@ export const playlistEngineService = {
       console.error('[Playlist Engine] Error fetching now playing:', error);
       return null;
     }
+  },
+
+  /**
+   * ===== إدارة الإعلانات المرئية =====
+   */
+
+  /**
+   * الحصول على الإعلانات المرئية المجدولة
+   */
+  async getScheduledVisualAds(): Promise<VisualAd[]> {
+    return await visualAdsService.getScheduledVisualAds();
+  },
+
+  /**
+   * تسجيل تفاعل مع إعلان مرئي
+   */
+  async logVisualAdInteraction(
+    visualAdId: string,
+    interactionType: 'view' | 'click' | 'skip' | 'like' | 'share',
+    interactionData?: any
+  ): Promise<void> {
+    await visualAdsService.logUserInteraction(visualAdId, interactionType, interactionData);
+  },
+
+  /**
+   * تسجيل عرض إعلان مرئي
+   */
+  async logVisualAdDisplay(
+    visualAdId: string,
+    displayDurationSeconds: number,
+    userAgent?: string,
+    deviceInfo?: any,
+    locationData?: any
+  ): Promise<void> {
+    await visualAdsService.logVisualAdDisplay(
+      visualAdId,
+      displayDurationSeconds,
+      userAgent,
+      deviceInfo,
+      locationData
+    );
+  },
+
+  /**
+   * الحصول على إحصائيات الإعلانات المرئية
+   */
+  async getVisualAdsStats(
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<any[]> {
+    return await visualAdsService.getVisualAdsStats(
+      startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      endDate || new Date()
+    );
+  },
+
+  /**
+   * الحصول على تفاعلات مستخدم مع الإعلانات المرئية
+   */
+  async getUserVisualAdInteractions(userId: string, limit: number = 50): Promise<any[]> {
+    return await visualAdsService.getUserInteractions(userId, limit);
   },
 };
 

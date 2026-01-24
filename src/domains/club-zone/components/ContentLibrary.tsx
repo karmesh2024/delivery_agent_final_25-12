@@ -9,32 +9,38 @@ import { Label } from '@/shared/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { Textarea } from '@/shared/ui/textarea';
-import { 
-  FiUpload, 
-  FiMusic, 
-  FiVideo, 
-  FiVolume2, 
-  FiBell, 
-  FiSearch, 
-  FiEdit, 
-  FiTrash2, 
+import {
+  FiUpload,
+  FiMusic,
+  FiVideo,
+  FiVolume2,
+  FiBell,
+  FiSearch,
+  FiEdit,
+  FiTrash2,
   FiPlay,
   FiX,
-  FiClock
+  FiClock,
+  FiImage,
+  FiCalendar
 } from 'react-icons/fi';
-import { radioContentService, RadioContent, ContentType } from '../services/radioContentService';
+import { radioContentService, RadioContent, ContentType, MediaType } from '../services/radioContentService';
+import { visualAdsService } from '../services/visualAdsService';
 import { toast } from 'react-toastify';
 
 interface ContentLibraryProps {
-  onContentSelect?: (content: RadioContent) => void;
+  onContentSelect?: (content: RadioContent | any) => void;
   selectedContentIds?: string[];
+  showVisualAds?: boolean;
 }
 
-export function ContentLibrary({ onContentSelect, selectedContentIds = [] }: ContentLibraryProps) {
+export function ContentLibrary({ onContentSelect, selectedContentIds = [], showVisualAds = false }: ContentLibraryProps) {
   const [content, setContent] = useState<RadioContent[]>([]);
+  const [visualAds, setVisualAds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<ContentType | 'all'>('all');
+  const [showVisualAds, setShowVisualAds] = useState(false);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [editingContent, setEditingContent] = useState<RadioContent | null>(null);
@@ -43,33 +49,57 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [] }: Con
   const [uploadForm, setUploadForm] = useState({
     title: '',
     content_type: 'clip' as ContentType,
+    media_type: 'audio' as MediaType,
     file: null as File | null,
     tags: '',
     priority: 'medium' as 'low' | 'medium' | 'high',
     allow_music_overlay: false,
+    // للإعلانات المرئية
+    description: '',
+    play_rule: 'continuous' as 'every_30_minutes' | 'hourly' | 'daily' | 'once' | 'continuous',
+    scheduled_time: '',
+    display_duration_seconds: 10,
   });
 
   useEffect(() => {
     loadContent();
-  }, [filterType, searchQuery]);
+  }, [filterType, searchQuery, showVisualAds]);
 
   const loadContent = async () => {
     try {
       setLoading(true);
-      const filters: any = {
-        is_active: true,
-      };
 
-      if (filterType !== 'all') {
-        filters.content_type = filterType;
+      if (showVisualAds) {
+        // تحميل الإعلانات المرئية
+        const filters: any = {
+          is_active: true,
+        };
+
+        if (searchQuery) {
+          filters.search = searchQuery;
+        }
+
+        const data = await visualAdsService.getAllVisualAds(filters);
+        setVisualAds(data);
+        setContent([]);
+      } else {
+        // تحميل المحتوى الصوتي
+        const filters: any = {
+          is_active: true,
+        };
+
+        if (filterType !== 'all') {
+          filters.content_type = filterType;
+        }
+
+        if (searchQuery) {
+          filters.search = searchQuery;
+        }
+
+        const data = await radioContentService.getAllContent(filters);
+        setContent(data);
+        setVisualAds([]);
       }
-
-      if (searchQuery) {
-        filters.search = searchQuery;
-      }
-
-      const data = await radioContentService.getAllContent(filters);
-      setContent(data);
     } catch (error) {
       console.error('Error loading content:', error);
       toast.error('حدث خطأ أثناء تحميل المحتوى');
@@ -87,31 +117,81 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [] }: Con
     try {
       setUploading(true);
 
-      const metadata: any = {
-        priority: uploadForm.priority,
-        allow_music_overlay: uploadForm.allow_music_overlay,
-      };
+      // التحقق من صحة نوع الملف
+      const fileType = uploadForm.file.type;
+      const isValidType =
+        (uploadForm.media_type === 'audio' && fileType.startsWith('audio/')) ||
+        (uploadForm.media_type === 'video' && fileType.startsWith('video/')) ||
+        (uploadForm.media_type === 'image' && fileType.startsWith('image/'));
 
-      if (uploadForm.tags) {
-        metadata.tags = uploadForm.tags.split(',').map(t => t.trim());
+      if (!isValidType) {
+        toast.error(`نوع الملف غير صحيح. يرجى اختيار ملف ${uploadForm.media_type}`);
+        return;
       }
 
-      await radioContentService.uploadContent(
-        uploadForm.file,
-        uploadForm.title,
-        uploadForm.content_type,
-        metadata
-      );
+      if (uploadForm.content_type === 'visual_ad') {
+        // رفع إعلان مرئي
+        const metadata: any = {
+          priority: uploadForm.priority,
+        };
 
-      toast.success('تم رفع المحتوى بنجاح');
+        if (uploadForm.tags) {
+          metadata.tags = uploadForm.tags.split(',').map(t => t.trim());
+        }
+
+        if (uploadForm.media_type === 'image') {
+          metadata.call_to_action = 'View Now';
+        }
+
+        await visualAdsService.uploadVisualAd(
+          uploadForm.file,
+          uploadForm.title,
+          uploadForm.media_type as 'image' | 'video',
+          {
+            description: uploadForm.description,
+            playRule: uploadForm.play_rule,
+            scheduledTime: uploadForm.scheduled_time || undefined,
+            priority: uploadForm.priority,
+            displayDurationSeconds: uploadForm.display_duration_seconds,
+            metadata,
+          }
+        );
+
+        toast.success('تم رفع الإعلان المرئي بنجاح');
+      } else {
+        // رفع محتوى صوتي عادي
+        const metadata: any = {
+          priority: uploadForm.priority,
+          allow_music_overlay: uploadForm.allow_music_overlay,
+        };
+
+        if (uploadForm.tags) {
+          metadata.tags = uploadForm.tags.split(',').map(t => t.trim());
+        }
+
+        await radioContentService.uploadContent(
+          uploadForm.file,
+          uploadForm.title,
+          uploadForm.content_type,
+          metadata
+        );
+
+        toast.success('تم رفع المحتوى الصوتي بنجاح');
+      }
+
       setIsUploadDialogOpen(false);
       setUploadForm({
         title: '',
         content_type: 'clip',
+        media_type: 'audio',
         file: null,
         tags: '',
         priority: 'medium',
         allow_music_overlay: false,
+        description: '',
+        play_rule: 'continuous',
+        scheduled_time: '',
+        display_duration_seconds: 10,
       });
       loadContent();
     } catch (error) {
@@ -123,13 +203,18 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [] }: Con
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا المحتوى؟')) {
+    if (!confirm(`هل أنت متأكد من حذف ${showVisualAds ? 'هذا الإعلان المرئي' : 'هذا المحتوى'}؟`)) {
       return;
     }
 
     try {
-      await radioContentService.deleteContent(id);
-      toast.success('تم حذف المحتوى بنجاح');
+      if (showVisualAds) {
+        await visualAdsService.deleteVisualAd(id);
+        toast.success('تم حذف الإعلان المرئي بنجاح');
+      } else {
+        await radioContentService.deleteContent(id);
+        toast.success('تم حذف المحتوى بنجاح');
+      }
       loadContent();
     } catch (error) {
       console.error('Error deleting content:', error);
@@ -180,6 +265,13 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [] }: Con
     return true;
   });
 
+  const filteredVisualAds = visualAds.filter(item => {
+    if (searchQuery && !item.title.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -188,10 +280,26 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [] }: Con
           <h2 className="text-2xl font-bold">مكتبة المحتوى</h2>
           <p className="text-gray-500">إدارة Clips, Music, Ads, Announcements</p>
         </div>
-        <Button onClick={() => setIsUploadDialogOpen(true)}>
-          <FiUpload className="w-4 h-4 mr-2" />
-          رفع محتوى جديد
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant={!showVisualAds ? "default" : "outline"}
+            onClick={() => setShowVisualAds(false)}
+          >
+            <FiMusic className="w-4 h-4 mr-2" />
+            محتوى صوتي
+          </Button>
+          <Button
+            variant={showVisualAds ? "default" : "outline"}
+            onClick={() => setShowVisualAds(true)}
+          >
+            <FiVideo className="w-4 h-4 mr-2" />
+            إعلانات مرئية
+          </Button>
+          <Button onClick={() => setIsUploadDialogOpen(true)}>
+            <FiUpload className="w-4 h-4 mr-2" />
+            رفع {showVisualAds ? 'إعلان مرئي' : 'محتوى صوتي'}
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -226,15 +334,17 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [] }: Con
         <div className="text-center py-8">
           <p className="text-gray-500">جاري التحميل...</p>
         </div>
-      ) : filteredContent.length === 0 ? (
+      ) : (showVisualAds ? filteredVisualAds : filteredContent).length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center">
-            <p className="text-gray-500">لا يوجد محتوى</p>
+            <p className="text-gray-500">
+              {showVisualAds ? 'لا توجد إعلانات مرئية' : 'لا يوجد محتوى'}
+            </p>
           </CardContent>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredContent.map((item) => (
+          {(showVisualAds ? filteredVisualAds : filteredContent).map((item) => (
             <Card
               key={item.id}
               className={`cursor-pointer transition-all ${
@@ -247,29 +357,71 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [] }: Con
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
-                    {getContentTypeIcon(item.content_type)}
+                    {showVisualAds ? (
+                      item.media_type === 'video' ? <FiVideo className="w-5 h-5" /> : <FiImage className="w-5 h-5" />
+                    ) : (
+                      getContentTypeIcon(item.content_type)
+                    )}
                     <CardTitle className="text-lg">{item.title}</CardTitle>
                   </div>
                   <Badge variant="outline">
-                    {getContentTypeLabel(item.content_type)}
+                    {showVisualAds
+                      ? (item.media_type === 'video' ? 'فيديو' : 'صورة')
+                      : getContentTypeLabel(item.content_type)
+                    }
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <FiClock className="w-4 h-4" />
-                    <span>{formatDuration(item.file_duration_seconds)}</span>
-                  </div>
-                  {item.metadata?.tags && item.metadata.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {item.metadata.tags.map((tag, idx) => (
-                        <Badge key={idx} variant="secondary" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
+                  {showVisualAds ? (
+                    // عرض معلومات الإعلان المرئي
+                    <>
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <FiClock className="w-4 h-4" />
+                        <span>
+                          {item.media_type === 'video'
+                            ? formatDuration(item.file_duration_seconds || 0)
+                            : `${item.display_duration_seconds || 10} ثانية`
+                          }
+                        </span>
+                      </div>
+                      {item.description && (
+                        <p className="text-sm text-gray-600">{item.description}</p>
+                      )}
+                      {item.play_rule && (
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <FiCalendar className="w-4 h-4" />
+                          <span>
+                            {item.play_rule === 'continuous' ? 'مستمر' :
+                             item.play_rule === 'every_30_minutes' ? 'كل 30 دقيقة' :
+                             item.play_rule === 'hourly' ? 'كل ساعة' :
+                             item.play_rule === 'daily' ? 'يومياً' :
+                             item.play_rule === 'once' ? 'مرة واحدة' : item.play_rule}
+                            {item.scheduled_time && ` (${item.scheduled_time})`}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    // عرض معلومات المحتوى الصوتي
+                    <>
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <FiClock className="w-4 h-4" />
+                        <span>{formatDuration(item.file_duration_seconds)}</span>
+                      </div>
+                      {item.metadata?.tags && item.metadata.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {item.metadata.tags.map((tag, idx) => (
+                            <Badge key={idx} variant="secondary" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
+
                   <div className="flex items-center justify-between pt-2">
                     <div className="flex gap-2">
                       <Button
@@ -350,10 +502,57 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [] }: Con
               </Select>
             </div>
             <div>
+              <Label>نوع الوسيطة</Label>
+              <Select
+                value={uploadForm.media_type}
+                onValueChange={(value: MediaType) => {
+                  setUploadForm({
+                    ...uploadForm,
+                    media_type: value,
+                    content_type: value === 'audio' ? 'clip' : 'visual_ad'
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="audio">صوتي (MP3, WAV, إلخ)</SelectItem>
+                  <SelectItem value="video">فيديو (MP4, AVI, إلخ)</SelectItem>
+                  <SelectItem value="image">صورة (JPG, PNG, إلخ)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {uploadForm.media_type === 'audio' && (
+              <div>
+                <Label>نوع المحتوى</Label>
+                <Select
+                  value={uploadForm.content_type}
+                  onValueChange={(value: ContentType) => setUploadForm({ ...uploadForm, content_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="clip">كليب</SelectItem>
+                    <SelectItem value="music">موسيقى</SelectItem>
+                    <SelectItem value="ad">إعلان صوتي</SelectItem>
+                    <SelectItem value="announcement">إعلان</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div>
               <Label>الملف</Label>
               <Input
                 type="file"
-                accept="audio/*"
+                accept={
+                  uploadForm.media_type === 'audio' ? 'audio/*' :
+                  uploadForm.media_type === 'video' ? 'video/*' :
+                  'image/*'
+                }
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
@@ -362,6 +561,74 @@ export function ContentLibrary({ onContentSelect, selectedContentIds = [] }: Con
                 }}
               />
             </div>
+
+            {uploadForm.content_type === 'visual_ad' && (
+              <>
+                <div>
+                  <Label>الوصف</Label>
+                  <Textarea
+                    value={uploadForm.description}
+                    onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
+                    placeholder="وصف الإعلان..."
+                  />
+                </div>
+
+                <div>
+                  <Label>قاعدة العرض</Label>
+                  <Select
+                    value={uploadForm.play_rule}
+                    onValueChange={(value: any) => setUploadForm({ ...uploadForm, play_rule: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="continuous">مستمر (في التدوير)</SelectItem>
+                      <SelectItem value="every_30_minutes">كل 30 دقيقة</SelectItem>
+                      <SelectItem value="hourly">كل ساعة</SelectItem>
+                      <SelectItem value="daily">يومياً</SelectItem>
+                      <SelectItem value="once">مرة واحدة</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {(uploadForm.play_rule === 'daily' || uploadForm.play_rule === 'once') && (
+                  <div>
+                    <Label>الوقت المحدد</Label>
+                    <Input
+                      type="time"
+                      value={uploadForm.scheduled_time}
+                      onChange={(e) => setUploadForm({ ...uploadForm, scheduled_time: e.target.value })}
+                    />
+                  </div>
+                )}
+
+                {uploadForm.media_type === 'image' && (
+                  <div>
+                    <Label>مدة العرض (بالثواني)</Label>
+                    <Input
+                      type="number"
+                      min="5"
+                      max="60"
+                      value={uploadForm.display_duration_seconds}
+                      onChange={(e) => setUploadForm({ ...uploadForm, display_duration_seconds: parseInt(e.target.value) })}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            {uploadForm.media_type === 'audio' && (
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="allow_music_overlay"
+                  checked={uploadForm.allow_music_overlay}
+                  onChange={(e) => setUploadForm({ ...uploadForm, allow_music_overlay: e.target.checked })}
+                />
+                <Label htmlFor="allow_music_overlay">السماح بتشغيل موسيقى فوق الكليب</Label>
+              </div>
+            )}
             <div>
               <Label>Tags (مفصولة بفواصل)</Label>
               <Input

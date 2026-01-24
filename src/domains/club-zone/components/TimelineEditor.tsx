@@ -18,7 +18,7 @@ import {
   FiArrowDown
 } from 'react-icons/fi';
 import { playlistTimelineService, PlaylistTimelineItem, PlayRule } from '../services/playlistTimelineService';
-import { RadioContent } from '../services/radioContentService';
+import { RadioContent, visualAdsService, VisualAd } from '../services/radioContentService';
 import { ContentLibrary } from './ContentLibrary';
 import { toast } from 'react-toastify';
 
@@ -28,7 +28,9 @@ export function TimelineEditor() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PlaylistTimelineItem | null>(null);
   const [selectedContent, setSelectedContent] = useState<RadioContent | null>(null);
+  const [selectedVisualAd, setSelectedVisualAd] = useState<VisualAd | null>(null);
   const [showContentLibrary, setShowContentLibrary] = useState(false);
+  const [showVisualAds, setShowVisualAds] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -56,8 +58,8 @@ export function TimelineEditor() {
   };
 
   const handleAddItem = async () => {
-    if (!selectedContent) {
-      toast.error('يرجى اختيار محتوى');
+    if (!selectedContent && !selectedVisualAd) {
+      toast.error('يرجى اختيار محتوى أو إعلان مرئي');
       return;
     }
 
@@ -67,17 +69,35 @@ export function TimelineEditor() {
         ? Math.max(...timelineItems.map(item => item.play_order))
         : 0;
 
-      await playlistTimelineService.createTimelineItem({
-        content_id: selectedContent.id,
-        play_order: maxOrder + 1,
-        scheduled_time: formData.scheduled_time || undefined,
-        play_rule: formData.play_rule || undefined,
-        priority: formData.priority,
-      });
+      if (selectedContent) {
+        // إضافة محتوى صوتي
+        await playlistTimelineService.createTimelineItem({
+          content_id: selectedContent.id,
+          play_order: maxOrder + 1,
+          scheduled_time: formData.scheduled_time || undefined,
+          play_rule: formData.play_rule || undefined,
+          priority: formData.priority,
+        });
 
-      toast.success('تم إضافة العنصر بنجاح');
+        toast.success('تم إضافة المحتوى الصوتي بنجاح');
+      } else if (selectedVisualAd) {
+        // إضافة إعلان مرئي (سيتم التعامل معه لاحقاً في النظام)
+        // للآن، سنضعه كعنصر في timeline مع نوع خاص
+        await playlistTimelineService.createTimelineItem({
+          content_id: selectedVisualAd.id, // استخدام ID الإعلان المرئي
+          play_order: maxOrder + 1,
+          scheduled_time: formData.scheduled_time || undefined,
+          play_rule: formData.play_rule || undefined,
+          priority: formData.priority,
+          // يمكن إضافة metadata لتحديد أنه إعلان مرئي
+        });
+
+        toast.success('تم إضافة الإعلان المرئي بنجاح');
+      }
+
       setIsAddDialogOpen(false);
       setSelectedContent(null);
+      setSelectedVisualAd(null);
       setFormData({
         play_order: 0,
         scheduled_time: '',
@@ -234,7 +254,10 @@ export function TimelineEditor() {
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold">{item.content?.title || 'محتوى محذوف'}</h3>
                       <Badge variant="secondary">
-                        {item.content?.content_type || 'unknown'}
+                        {item.content?.media_type === 'video' || item.content?.media_type === 'image'
+                          ? `إعلان ${item.content.media_type === 'video' ? 'فيديو' : 'صورة'}`
+                          : (item.content?.content_type || 'unknown')
+                        }
                       </Badge>
                     </div>
                     <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
@@ -312,20 +335,26 @@ export function TimelineEditor() {
           <div className="space-y-4">
             {/* Content Selection */}
             <div>
-              <Label>المحتوى</Label>
+              <Label>المحتوى أو الإعلان المرئي</Label>
               {selectedContent ? (
                 <Card className="mt-2">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
                         <h4 className="font-semibold">{selectedContent.title}</h4>
-                        <p className="text-sm text-gray-500">{selectedContent.content_type}</p>
+                        <p className="text-sm text-gray-500">
+                          {selectedContent.media_type === 'video' || selectedContent.media_type === 'image'
+                            ? `إعلان ${selectedContent.media_type === 'video' ? 'فيديو' : 'صورة'}`
+                            : selectedContent.content_type
+                          }
+                        </p>
                       </div>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
                           setSelectedContent(null);
+                          setSelectedVisualAd(null);
                           setShowContentLibrary(true);
                         }}
                       >
@@ -334,15 +363,49 @@ export function TimelineEditor() {
                     </div>
                   </CardContent>
                 </Card>
+              ) : selectedVisualAd ? (
+                <Card className="mt-2">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold">{selectedVisualAd.title}</h4>
+                        <p className="text-sm text-gray-500">
+                          إعلان {selectedVisualAd.media_type === 'video' ? 'فيديو' : 'صورة'}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedContent(null);
+                          setSelectedVisualAd(null);
+                          setShowVisualAds(true);
+                        }}
+                      >
+                        تغيير
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               ) : (
-                <Button
-                  variant="outline"
-                  className="w-full mt-2"
-                  onClick={() => setShowContentLibrary(true)}
-                >
-                  <FiPlus className="w-4 h-4 mr-2" />
-                  اختيار محتوى
-                </Button>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setShowContentLibrary(true)}
+                  >
+                    <FiPlus className="w-4 h-4 mr-2" />
+                    محتوى صوتي
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setShowVisualAds(true)}
+                  >
+                    <FiPlus className="w-4 h-4 mr-2" />
+                    إعلان مرئي
+                  </Button>
+                </div>
               )}
             </div>
 
@@ -416,12 +479,32 @@ export function TimelineEditor() {
         <Dialog open={showContentLibrary} onOpenChange={setShowContentLibrary}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>اختر محتوى</DialogTitle>
+              <DialogTitle>اختر محتوى صوتي</DialogTitle>
             </DialogHeader>
             <ContentLibrary
               onContentSelect={(content) => {
                 setSelectedContent(content);
+                setSelectedVisualAd(null);
                 setShowContentLibrary(false);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Visual Ads Library Dialog */}
+      {showVisualAds && (
+        <Dialog open={showVisualAds} onOpenChange={setShowVisualAds}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>اختر إعلان مرئي</DialogTitle>
+            </DialogHeader>
+            <ContentLibrary
+              showVisualAds={true}
+              onContentSelect={(ad: any) => {
+                setSelectedVisualAd(ad);
+                setSelectedContent(null);
+                setShowVisualAds(false);
               }}
             />
           </DialogContent>
