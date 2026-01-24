@@ -21,7 +21,8 @@ import {
   FiCheck,
   FiUsers,
   FiClock,
-  FiList
+  FiList,
+  FiVideo
 } from 'react-icons/fi';
 import Link from 'next/link';
 import { ContentLibrary } from '@/domains/club-zone/components/ContentLibrary';
