@@ -14,9 +14,10 @@
 - ✅ `CRON_SECRET` - سر التحقق من Cron Jobs
 
 ### 3. Vercel Configuration (اختياري)
-- ✅ `vercel.json` مُعد بـ Cron Jobs كل دقيقة
-- ⚠️ **ملاحظة:** Vercel Cron Jobs تتطلب خطة Pro ($20/شهر) أو Enterprise
-- ✅ **الحل المجاني:** استخدام cron-job.org (موصى به)
+- ✅ `vercel.json` مُعد بـ Cron Jobs **مرة يومياً** (متوافق مع Hobby Plan)
+- ⚠️ **مهم:** Vercel Hobby Plan (المجاني) يسمح فقط بـ Cron Jobs **مرة واحدة يومياً**
+- ✅ **الحل المجاني للتكرار كل دقيقة:** استخدام cron-job.org (موصى به بشدة)
+- 📖 راجع: `VERCEL_CRON_LIMITATIONS.md` للتفاصيل الكاملة
 
 ## 🔧 الخطوات التالية
 
