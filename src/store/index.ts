@@ -26,9 +26,19 @@ import purchasingReducer from "@/domains/purchasing/store/purchasingSlice";
 import industrialPartnersReducer from "../domains/waste-management/partners/store/industrialPartnersSlice";
 import pointsReducer from "@/domains/financial-management/points/store/pointsSlice";
 import clubZoneReducer from "@/domains/club-zone/store/clubZoneSlice";
+import productRequestsReducer from "@/domains/product-requests/store/productRequestsSlice";
+import settingsReducer from "@/domains/settings/store/settingsSlice";
+import zoonClubReducer from "@/domains/zoon-club/store/zoonClubSlice";
+import zoonCirclesReducer from "@/domains/zoon-club/store/zoonCirclesSlice";
+import messagesReducer from "@/domains/messages/store/messagesSlice";
+import zoonReducer from "./slices/zoonSlice";
+import aiSkillsReducer from "./slices/aiSkillsSlice";
+
+
 
 export const store = configureStore({
   reducer: {
+    aiSkills: aiSkillsReducer,
     provinces: provincesReducer,
     permissions: permissionsReducer,
     permissionsManagement: permissionsManagementReducer, // إضافة reducer للأدوار والصلاحيات
@@ -56,6 +66,12 @@ export const store = configureStore({
     industrialPartners: industrialPartnersReducer,
     points: pointsReducer,
     clubZone: clubZoneReducer,
+    productRequests: productRequestsReducer,
+    settings: settingsReducer,
+    zoonClub: zoonClubReducer,
+    zoonCircles: zoonCirclesReducer,
+    messages: messagesReducer,
+    zoon: zoonReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

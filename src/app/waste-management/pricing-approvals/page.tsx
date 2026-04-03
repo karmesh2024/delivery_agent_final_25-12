@@ -22,6 +22,10 @@ import {
   FiRefreshCw
 } from "react-icons/fi";
 import { priceApprovalService, PriceApprovalRequest } from '@/domains/waste-management/services/priceApprovalService';
+import {
+  subcategoryPriceApprovalService,
+  SubcategoryPriceApprovalRequest,
+} from '@/domains/waste-management/services/subcategoryPriceApprovalService';
 import { canManagePricing } from '@/domains/waste-management/services/wasteManagementPermissions';
 import { getCurrentUserId } from '@/lib/logger-safe';
 import { useToast } from '@/shared/ui/use-toast';
@@ -30,6 +34,7 @@ import { PriceApprovalDetailsDialog } from '@/domains/waste-management/component
 
 export default function PriceApprovalsPage() {
   const [requests, setRequests] = useState<PriceApprovalRequest[]>([]);
+  const [subcategoryRequests, setSubcategoryRequests] = useState<SubcategoryPriceApprovalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<PriceApprovalRequest | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
@@ -42,8 +47,12 @@ export default function PriceApprovalsPage() {
   const loadRequests = async () => {
     setLoading(true);
     try {
-      const data = await priceApprovalService.getPendingApprovals();
-      setRequests(data);
+      const [productData, subcategoryData] = await Promise.all([
+        priceApprovalService.getPendingApprovals(),
+        subcategoryPriceApprovalService.getPending(),
+      ]);
+      setRequests(productData);
+      setSubcategoryRequests(subcategoryData);
     } catch (error) {
       console.error('خطأ في جلب طلبات الموافقة:', error);
       toast({
@@ -148,18 +157,21 @@ export default function PriceApprovalsPage() {
           <div className="text-center py-10">
             <p className="text-gray-500">جاري تحميل طلبات الموافقة...</p>
           </div>
-        ) : requests.length === 0 ? (
+        ) : requests.length === 0 && subcategoryRequests.length === 0 ? (
           <Card>
             <CardContent className="py-10 text-center">
               <p className="text-gray-500">لا توجد طلبات موافقة معلقة حالياً</p>
             </CardContent>
           </Card>
         ) : (
+          <>
+          {/* طلبات أسعار المنتجات (stock_exchange) */}
+          {requests.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>الطلبات المعلقة ({requests.length})</CardTitle>
+              <CardTitle>طلبات أسعار المنتجات ({requests.length})</CardTitle>
               <CardDescription>
-                طلبات تغيير الأسعار التي تحتاج إلى موافقة
+                طلبات تغيير أسعار المنتجات في البورصة
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -242,6 +254,89 @@ export default function PriceApprovalsPage() {
               </Table>
             </CardContent>
           </Card>
+          )}
+
+          {/* طلبات أسعار الفئات الفرعية */}
+          {subcategoryRequests.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>طلبات أسعار الفئات الفرعية ({subcategoryRequests.length})</CardTitle>
+              <CardDescription>
+                تغيير سعر البورصة للفئة ≥10% — تحتاج موافقة
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>الفئة الفرعية</TableHead>
+                    <TableHead>السعر القديم</TableHead>
+                    <TableHead>السعر الجديد</TableHead>
+                    <TableHead>نسبة التغيير</TableHead>
+                    <TableHead>السبب</TableHead>
+                    <TableHead>الإجراءات</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {subcategoryRequests.map((req) => (
+                    <TableRow key={req.id}>
+                      <TableCell className="font-medium">{req.subcategory_name ?? req.subcategory_id}</TableCell>
+                      <TableCell>{req.old_price != null ? `${req.old_price} ج.م` : '-'}</TableCell>
+                      <TableCell className="font-medium">{req.new_price} ج.م</TableCell>
+                      <TableCell>
+                        {req.price_change_percentage > 0 ? (
+                          <span className="text-red-600">+{req.price_change_percentage.toFixed(1)}%</span>
+                        ) : req.price_change_percentage < 0 ? (
+                          <span className="text-green-600">{req.price_change_percentage.toFixed(1)}%</span>
+                        ) : (
+                          <span className="text-gray-500">0%</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">{req.reason}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={async () => {
+                              const uid = await getCurrentUserId();
+                              if (!uid) {
+                                toast({ title: "خطأ", description: "يجب تسجيل الدخول", variant: "destructive" });
+                                return;
+                              }
+                              const notes = window.prompt('ملاحظات الموافقة (اختياري):');
+                              const ok = await subcategoryPriceApprovalService.approve(req.id!, uid, notes ?? undefined);
+                              if (ok) loadRequests();
+                            }}
+                          >
+                            <FiCheck className="h-4 w-4 mr-1" />
+                            موافقة
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={async () => {
+                              const reason = window.prompt('سبب الرفض:');
+                              if (!reason) return;
+                              const uid = await getCurrentUserId();
+                              if (!uid) return;
+                              const ok = await subcategoryPriceApprovalService.reject(req.id!, uid, reason);
+                              if (ok) loadRequests();
+                            }}
+                          >
+                            <FiX className="h-4 w-4 mr-1" />
+                            رفض
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+          )}
+          </>
         )}
 
         {/* Dialog للتفاصيل */}

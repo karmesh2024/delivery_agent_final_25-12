@@ -47,6 +47,8 @@ export interface ProductCatalogItem {
   main_category?: { name: string };
   sub_category?: { name: string };
   unit?: { name: string };
+  /** ربط بالتنظيم (قطاع → تصنيف → فئة → فئة فرعية) مثل المخلفات */
+  unified_sub_category_id?: string | null;
 }
 
 export interface ProductMainCategory {
@@ -271,7 +273,7 @@ class ProductCatalogService {
   // جلب جميع المنتجات
   async getProducts(): Promise<ProductCatalogItem[]> {
     try {
-      // الخطوة 1: جلب المنتجات من الكتالوج
+      // الخطوة 1: جلب المنتجات من الكتالوج (مع عمود الربط بالتنظيم إن وُجد)
       const { data: catalogItems, error: catalogError } = await supabase
         .from('catalog_products')
         .select(`

@@ -7,8 +7,9 @@ import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
 import { Textarea } from '@/shared/ui/textarea';
 import { EnhancedDropdown } from '@/shared/ui/enhanced-dropdown';
-import { FiX, FiSave, FiPlus } from 'react-icons/fi';
+import { FiX, FiSave, FiPlus, FiUpload } from 'react-icons/fi';
 import { toast } from '@/shared/ui/toast';
+import { categoryService } from '@/domains/product-categories/api/categoryService';
 
 // Type definitions
 export type DialogType = 'sector' | 'classification' | 'mainCategory' | 'subCategory' | 'warehouse' | 'permission' | 'delegation';
@@ -101,6 +102,12 @@ export interface FormData {
   expires_at: string;
   permissions: Permission[];
   warehouse_id?: string;
+  /** للفئة الفرعية: رابط صورة الفئة */
+  image_url?: string;
+  /** للفئة الفرعية: سعر شراء البورصة الأولي (اختياري) */
+  initial_exchange_buy_price?: number;
+  /** للفئة الفرعية: سعر بيع البورصة الأولي (اختياري) */
+  initial_exchange_sell_price?: number;
 }
 
 interface UniversalDialogProps {
@@ -135,6 +142,8 @@ export function UniversalDialog({
   console.log('UniversalDialog - props:', { isOpen, title, type, initialData, sectors, classifications, mainCategories });
   
   const didInitRef = React.useRef(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isUploadingImage, setIsUploadingImage] = React.useState(false);
   const [formData, setFormData] = React.useState<FormData>({
     name: initialData?.name || '',
     description: initialData?.description || '',
@@ -157,7 +166,8 @@ export function UniversalDialog({
     permission_types: initialData?.permission_types || [],
     delegation_level: initialData?.delegation_level || '',
     expires_at: initialData?.expires_at || '',
-    permissions: initialData?.permissions || []
+    permissions: initialData?.permissions || [],
+    image_url: initialData?.image_url || '',
   });
 
   // استخدام useRef لتتبع آخر initialData لتجنب infinite loops
@@ -210,7 +220,8 @@ export function UniversalDialog({
       permission_types: initialData?.permission_types || [],
       delegation_level: initialData?.delegation_level || '',
       expires_at: initialData?.expires_at || '',
-      permissions: initialData?.permissions || []
+      permissions: initialData?.permissions || [],
+      image_url: initialData?.image_url || '',
     }));
   }, [isOpen, type, initialData?.id]);
 
@@ -304,7 +315,8 @@ export function UniversalDialog({
       permission_types: [],
       delegation_level: '',
       expires_at: '',
-      permissions: []
+      permissions: [],
+      image_url: '',
     });
     onClose();
   };
@@ -344,6 +356,45 @@ export function UniversalDialog({
 
   const isAllSectorsSelected = formData.sector_ids.length === sectors.length && sectors.length > 0;
   const isSectorSelected = (sectorId: string) => formData.sector_ids.includes(sectorId);
+
+  // دالة لرفع الصورة
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // التحقق من نوع الملف
+    if (!file.type.startsWith('image/')) {
+      toast({ type: 'error', title: 'خطأ', description: 'يرجى اختيار ملف صورة' });
+      return;
+    }
+
+    // التحقق من حجم الملف (5MB كحد أقصى)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ type: 'error', title: 'خطأ', description: 'حجم الصورة يجب أن يكون أقل من 5 ميجابايت' });
+      return;
+    }
+
+    setIsUploadingImage(true);
+    try {
+      const { url, error } = await categoryService.uploadImage(file, 'subcategories');
+      if (error) {
+        throw new Error(error);
+      }
+      if (url) {
+        setFormData({ ...formData, image_url: url });
+        toast({ type: 'success', title: 'نجح', description: 'تم رفع الصورة بنجاح' });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'فشل رفع الصورة';
+      toast({ type: 'error', title: 'خطأ', description: errorMessage });
+    } finally {
+      setIsUploadingImage(false);
+      // إعادة تعيين input file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   return (
     <CustomDialog
@@ -784,9 +835,9 @@ export function UniversalDialog({
             </div>
           )}
 
-          {/* اختيار الفئة الأساسية - للفئات الفرعية فقط */}
+          {/* اختيار الفئة الأساسية + صورة الفئة - للفئات الفرعية فقط */}
           {type === 'subCategory' && (
-            <div className="space-y-2">
+            <div className="space-y-4">
               <EnhancedDropdown
                 options={mainCategories}
                 value={formData.main_category_id}
@@ -798,6 +849,91 @@ export function UniversalDialog({
                 showUniqueOnly={false}
                 className="w-full"
               />
+              <div className="space-y-2">
+                <Label htmlFor="image_url" className="text-gray-700 font-medium">صورة الفئة الفرعية</Label>
+                
+                {/* زر تحميل الصورة */}
+                <div className="flex gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="image-upload-input"
+                    disabled={isUploadingImage}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingImage}
+                    className="flex items-center gap-2"
+                  >
+                    <FiUpload className="w-4 h-4" />
+                    {isUploadingImage ? 'جاري الرفع...' : 'تحميل صورة'}
+                  </Button>
+                </div>
+
+                {/* حقل رابط الصورة (لإدخال URL يدوياً) */}
+                <div className="space-y-1">
+                  <Label htmlFor="image_url" className="text-sm text-gray-600">أو أدخل رابط الصورة:</Label>
+                  <Input
+                    id="image_url"
+                    type="url"
+                    value={formData.image_url || ''}
+                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                    placeholder="https://... (اختياري)"
+                    className="bg-white text-gray-900 border-gray-300"
+                  />
+                </div>
+
+                {/* معاينة الصورة */}
+                {(formData.image_url || initialData?.image_url) && (
+                  <div className="mt-2">
+                    <Label className="text-sm text-gray-600 mb-1 block">معاينة الصورة:</Label>
+                    <img
+                      src={formData.image_url || initialData?.image_url || ''}
+                      alt="معاينة"
+                      className="h-32 w-32 object-cover rounded border border-gray-200"
+                      onError={(e) => { 
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        toast({ type: 'warning', title: 'تحذير', description: 'فشل تحميل الصورة. تحقق من الرابط.' });
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* سعر البورصة الأولي (اختياري) - إنشاء فئة فرعية مع سعر في خطوة واحدة */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="initial_exchange_buy_price" className="text-gray-700 font-medium">سعر شراء البورصة الأولي (اختياري)</Label>
+                  <Input
+                    id="initial_exchange_buy_price"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={formData.initial_exchange_buy_price ?? ''}
+                    onChange={(e) => setFormData({ ...formData, initial_exchange_buy_price: e.target.value ? Number(e.target.value) : undefined })}
+                    placeholder="0.00"
+                    className="bg-white text-gray-900 border-gray-300"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="initial_exchange_sell_price" className="text-gray-700 font-medium">سعر بيع البورصة الأولي (اختياري)</Label>
+                  <Input
+                    id="initial_exchange_sell_price"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={formData.initial_exchange_sell_price ?? ''}
+                    onChange={(e) => setFormData({ ...formData, initial_exchange_sell_price: e.target.value ? Number(e.target.value) : undefined })}
+                    placeholder="يُحسب تلقائياً إن تُرك فارغاً"
+                    className="bg-white text-gray-900 border-gray-300"
+                  />
+                </div>
+              </div>
             </div>
           )}
 

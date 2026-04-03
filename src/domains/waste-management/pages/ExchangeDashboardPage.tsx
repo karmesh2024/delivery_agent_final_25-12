@@ -23,7 +23,7 @@ import {
   TableRow,
 } from '@/shared/ui/table';
 import { Input } from '@/shared/components/ui/input';
-import { ArrowUp, ArrowDown, RefreshCw, Edit, Save, X, TrendingUp, AlertTriangle, Calculator, Briefcase } from 'lucide-react';
+import { ArrowUp, ArrowDown, RefreshCw, Edit, Save, X, TrendingUp, AlertTriangle, Calculator, Briefcase, ChevronDown, ChevronRight, Box, Filter, Search, Layers } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { format } from 'date-fns';
@@ -39,6 +39,13 @@ import {
   DialogTrigger,
 } from "@/shared/components/ui/dialog";
 import { Label } from "@/shared/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/ui/select";
 import { LivePriceTable } from '../components/LivePriceTable';
 import { PriceTicker } from '../components/PriceTicker';
 
@@ -64,10 +71,38 @@ const ExchangeDashboardPage: React.FC = () => {
     marketAverage: 0
   });
   
-  // Trends state
   const [trends, setTrends] = useState<any[]>([]);
-  
-  // ... existing state
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
+  const [selectedMainCat, setSelectedMainCat] = useState<string>('all');
+  const [selectedSubCat, setSelectedSubCat] = useState<string>('all');
+
+  const mainCategories = useMemo(() => {
+    const cats = new Set<string>();
+    prices.forEach(p => {
+      const catName = (p.catalog_item?.main_category as any)?.name || p.category?.name || 'تصنيف عام';
+      cats.add(catName);
+    });
+    return Array.from(cats);
+  }, [prices]);
+
+  const subCategories = useMemo(() => {
+    const subs = new Set<string>();
+    prices.forEach(p => {
+      const mainName = (p.catalog_item?.main_category as any)?.name || p.category?.name || 'تصنيف عام';
+      if (selectedMainCat === 'all' || mainName === selectedMainCat) {
+        const subName = p.catalog_item?.sub_category?.name || p.subcategory?.name || 'عام';
+        subs.add(subName);
+      }
+    });
+    return Array.from(subs);
+  }, [prices, selectedMainCat]);
+
+  const toggleCat = (catId: string) => {
+    const newKeys = new Set(expandedCats);
+    if (newKeys.has(catId)) newKeys.delete(catId);
+    else newKeys.add(catId);
+    setExpandedCats(newKeys);
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -410,13 +445,32 @@ const ExchangeDashboardPage: React.FC = () => {
     }
   };
 
-  const filteredExchangeData = prices.filter((item) => {
-    const itemName = item.catalog_item?.name || item.product?.name || item.product_id;
-    const wasteNo = item.catalog_item?.waste_no || '';
-    const matchesSearch = itemName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         wasteNo.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
+  const filteredExchangeData = useMemo(() => {
+    return prices.filter((item) => {
+      const itemName = item.catalog_item?.name || item.product?.name || item.product_id;
+      const wasteNo = item.catalog_item?.waste_no || '';
+      const mainCat = (item.catalog_item?.main_category as any)?.name || item.category?.name || 'تصنيف عام';
+      const subCat = item.catalog_item?.sub_category?.name || item.subcategory?.name || 'عام';
+      
+      const matchesSearch = itemName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                           wasteNo.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesMain = selectedMainCat === 'all' || mainCat === selectedMainCat;
+      const matchesSub = selectedSubCat === 'all' || subCat === selectedSubCat;
+      
+      return matchesSearch && matchesMain && matchesSub;
+    });
+  }, [prices, searchTerm, selectedMainCat, selectedSubCat]);
+
+  // تجميع البيانات للشجرة
+  const treeData = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    filteredExchangeData.forEach(item => {
+      const key = (item.catalog_item?.main_category as any)?.name || item.category?.name || 'تصنيف عام';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    });
+    return groups;
+  }, [filteredExchangeData]);
 
 
 
@@ -582,12 +636,41 @@ const ExchangeDashboardPage: React.FC = () => {
         </DialogContent>
       </Dialog>
        {/* ... Header ... */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">لوحة تحكم البورصة</h1>
-          <p className="text-gray-500 mt-1">إدارة أسعار المواد ونسب الربحية بناءً على طلب السوق</p>
+          <p className="text-gray-500 mt-1">إدارة أسعار المواد ونسب الربحية بنظام الشجرة والفلترة الذكية</p>
         </div>
-        {/* ... Buttons ... */}
+        
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <div className="relative flex-1 md:flex-none md:w-64">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input 
+              placeholder="بحث في المواد..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pr-10 bg-white"
+            />
+          </div>
+          <Select value={selectedMainCat} onValueChange={setSelectedMainCat}>
+            <SelectTrigger className="w-[160px] bg-white">
+              <SelectValue placeholder="الفئة الرئيسية" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">كل الفئات</SelectItem>
+              {mainCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={selectedSubCat} onValueChange={setSelectedSubCat}>
+            <SelectTrigger className="w-[160px] bg-white">
+              <SelectValue placeholder="الفئة الفرعية" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">كل الفرعية</SelectItem>
+              {subCategories.map(sub => <SelectItem key={sub} value={sub}>{sub}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Tabs defaultValue="prices" className="w-full">
@@ -657,252 +740,181 @@ const ExchangeDashboardPage: React.FC = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredExchangeData.map((item, index: number) => {
-                     const itemName = item.catalog_item?.name || item.product?.name || item.product_id;
-
-                     return (
-                       <TableRow key={item.product_id} className="hover:bg-blue-50/30 transition-colors border-b last:border-0 hover:shadow-sm">
-                         <TableCell className="text-center text-gray-400 font-medium">{index + 1}</TableCell>
-                         <TableCell className="font-semibold text-gray-800 text-base">
-                            <div className="flex flex-col">
-                               <span>{itemName}</span>
-                               <div className="flex items-center gap-2 mt-0.5">
-                                 <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold border border-blue-100">
-                                   {item.catalog_item?.waste_no || 'بدون كود'}
-                                 </span>
-                                 <span className="text-xs text-muted-foreground font-normal" title={(item.catalog_item?.main_category as any)?.full_path || (item.catalog_item?.main_category as any)?.name || 'تصنيف عام'}>
-                                   {(item.catalog_item?.main_category as any)?.full_path || 
-                                    (item.catalog_item?.main_category as any)?.name || 
-                                    item.category?.name || 
-                                    'تصنيف عام'}
-                                 </span>
-                               </div>
+                  {Object.entries(treeData).map(([catName, items], catIndex) => {
+                    const isExpanded = expandedCats.has(catName);
+                    return (
+                      <React.Fragment key={catName}>
+                        {/* Row for Category */}
+                        <TableRow className="bg-gray-50/50 hover:bg-gray-100/80 cursor-pointer border-r-4 border-r-primary/40" onClick={() => toggleCat(catName)}>
+                          <TableCell className="text-center font-bold text-gray-400">
+                            {isExpanded ? <ChevronDown className="w-5 h-5 mx-auto" /> : <ChevronRight className="w-5 h-5 mx-auto" /> }
+                          </TableCell>
+                          <TableCell colSpan={2} className="py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-primary/10 rounded-lg">
+                                <Layers className="w-4 h-4 text-primary" />
+                              </div>
+                              <div>
+                                <div className="text-xs text-primary font-bold opacity-70">الفئة الرئيسية</div>
+                                <div className="text-lg font-black text-gray-900">{catName}</div>
+                              </div>
+                              <Badge variant="outline" className="mr-2 bg-white">{items.length} مواد</Badge>
                             </div>
-                         </TableCell>
-                         <TableCell className="text-center font-medium text-gray-500">{item.base_price?.toFixed(2)}</TableCell>
-                         
-                         <TableCell className="text-center font-bold text-lg bg-gray-50/50">
-                            <span className="text-primary">{item.buy_price.toLocaleString()} ج.م</span>
-                         </TableCell>
-
-                         <TableCell className="text-center font-bold text-blue-600 bg-blue-50/30">
-                            <span>{item.sell_price ? item.sell_price.toLocaleString() : '-'} ج.م</span>
-                            {item.sell_price && (
-                              <div className="text-xs text-blue-500 mt-1">للطن</div>
-                            )}
-                         </TableCell>
-
-                          {/* Trend Indicator Column */}
-                          <TableCell className="text-center">
-                            {(() => {
-                              // تحويل القيم إلى numbers للتأكد من الحساب الصحيح
-                              const buyPrice = Number(item.buy_price) || 0;
-                              const basePrice = Number(item.base_price) || 0;
-                              
-                              // محاولة استخدام trends من exchange_price_history أولاً
-                              // المطابقة: stock_exchange_id في التاريخ يجب أن يطابق id في stock_exchange
-                              // stock_exchange.id هو INTEGER و exchange_price_history.stock_exchange_id هو BIGINT
-                              const itemId = Number(item.id) || 0;
-                              const itemProductId = item.product_id || '';
-                              
-                              // فحص إذا كان item.product_id هو BigInt (رقم) وليس UUID
-                              const isProductIdBigInt = itemProductId && !itemProductId.includes('-') && !isNaN(Number(itemProductId));
-                              
-                              // إزالة console.log المفرط - فقط للـ debug عند الحاجة
-                              // console.log(`🔍 فحص المطابقة للمنتج:`, {...});
-                              
-                              const trend = trends.find(t => {
-                                const trendId = Number(t.stock_exchange_id) || 0;
-                                const trendProductId = t.product_id || '';
-                                
-                                // مطابقة بـ stock_exchange_id أولاً (الأفضل)
-                                const matchById = trendId === itemId && itemId > 0;
-                                
-                                // مطابقة بـ product_id إذا كان item.id === 0 أو إذا كان item.id هو UUID
-                                // لكن إذا كان item.product_id هو BigInt، لا نستخدمه للمطابقة
-                                const matchByProductId = !isProductIdBigInt && 
-                                                         trendProductId && 
-                                                         itemProductId && 
-                                                         trendProductId === itemProductId;
-                                
-                                return matchById || matchByProductId;
-                              });
-                              
-                              // Debug log فقط عند عدم العثور على trend
-                              if (!trend && itemId > 0 && trends.length > 0) {
-                                console.log(`⚠️ لم يتم العثور على trend للمنتج ${itemId}:`, {
-                                  itemId,
-                                  itemProductId,
-                                  trendsCount: trends.length,
-                                  availableTrends: trends.map(t => ({
-                                    stock_exchange_id: t.stock_exchange_id,
-                                    product_id: t.product_id
-                                  }))
-                                });
-                              }
-                              
-                              // تم العثور على trend أو لا - سيتم التعامل معه في العرض
-                              
-                              // استخدام last_actual_purchase_price (آخر سعر تم الشراء به فعلياً) كسعر مرجعي
-                              // هذا يعطي مؤشراً دقيقاً للعميل عن التغير في السعر مقارنة بآخر عملية شراء فعلية
-                              let price24hAgo = 0;
-                              
-                              if (trend && trend.price_24h_ago) {
-                                price24hAgo = Number(trend.price_24h_ago) || 0;
-                              }
-                              
-                              // إذا لم يكن هناك trend أو price_24h_ago = 0 أو يساوي السعر الحالي
-                              // نستخدم base_price كسعر مرجعي فقط إذا كان مختلفاً عن السعر الحالي
-                              if ((price24hAgo === 0 || price24hAgo === buyPrice) && basePrice > 0 && basePrice !== buyPrice) {
-                                price24hAgo = basePrice;
-                              }
-                              
-                              // حساب الفرق بين السعر الحالي والسعر المرجعي
-                              if (price24hAgo > 0) {
-                                const diff = buyPrice - price24hAgo;
-                                if (Math.abs(diff) < 0.01) {
-                                  return <span className="text-gray-400 font-bold">0.00</span>;
-                                }
-                                
-                                return diff > 0 ? (
-                                  <div className="flex items-center justify-center text-green-600 gap-1 bg-green-50 px-2 py-1 rounded-full w-fit mx-auto">
-                                    <TrendingUp size={14} />
-                                    <span className="text-xs font-bold">+{diff.toFixed(2)}</span>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center justify-center text-red-600 gap-1 bg-red-50 px-2 py-1 rounded-full w-fit mx-auto">
-                                    <ArrowDown size={14} />
-                                    <span className="text-xs font-bold">{diff.toFixed(2)}</span>
-                                  </div>
-                                );
-                              }
-                              
-                              // إذا لم يكن هناك سعر مرجعي، نعرض 0.00 بدلاً من "-"
-                              return <span className="text-gray-400 font-bold">0.00</span>;
-                            })()}
                           </TableCell>
+                          <TableCell colSpan={6}></TableCell>
+                        </TableRow>
 
-                          {/* Percentage Change Column */}
-                          <TableCell className="text-center dir-ltr">
-                            {(() => {
-                                // تحويل القيم إلى numbers للتأكد من الحساب الصحيح
-                                const buyPrice = Number(item.buy_price) || 0;
-                                const basePrice = Number(item.base_price) || 0;
-                                
-                                // محاولة استخدام trends من exchange_price_history أولاً
-                                // المطابقة: stock_exchange_id في التاريخ يجب أن يطابق id في stock_exchange
-                                // stock_exchange.id هو INTEGER و exchange_price_history.stock_exchange_id هو BIGINT
-                                const itemId = Number(item.id) || 0;
-                                const itemProductId = item.product_id || '';
-                                
-                                const trend = trends.find(t => {
-                                  const trendId = Number(t.stock_exchange_id) || 0;
-                                  const trendProductId = t.product_id || '';
-                                  
-                                  // مطابقة بـ stock_exchange_id أولاً (الأفضل)
-                                  const matchById = trendId === itemId && itemId > 0;
-                                  
-                                  // مطابقة بـ product_id إذا كان item.id === 0 أو إذا كان item.id هو UUID
-                                  const matchByProductId = trendProductId && itemProductId && 
-                                                           trendProductId === itemProductId;
-                                  
-                                  return matchById || matchByProductId;
-                                });
-                                
-                                // استخدام last_actual_purchase_price (آخر سعر تم الشراء به فعلياً) كسعر مرجعي
-                                // هذا يعطي نسبة تغير دقيقة للعميل مقارنة بآخر عملية شراء فعلية
-                                let price24hAgo = 0;
-                                
-                                if (trend && trend.price_24h_ago) {
-                                    price24hAgo = Number(trend.price_24h_ago) || 0;
-                                }
-                                
-                                // إذا لم يكن هناك trend أو price_24h_ago = 0، نستخدم base_price كسعر مرجعي
-                                if (price24hAgo === 0 && basePrice > 0) {
-                                    price24hAgo = basePrice;
-                                }
-                                
-                                // حساب نسبة التغير بين السعر الحالي والسعر المرجعي
-                                if (price24hAgo > 0) {
-                                    const diff = buyPrice - price24hAgo;
-                                    if (Math.abs(diff) < 0.01) {
-                                        return <span className="text-gray-400 font-bold">0.0%</span>;
-                                    }
-                                    
-                                    const percent = (diff / price24hAgo) * 100;
-                                    
-                                    return (
-                                        <span className={`text-xs font-bold ${percent > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                            {percent > 0 ? '+' : ''}{percent.toFixed(1)}%
-                                        </span>
-                                    );
-                                }
-                                
-                                // إذا لم يكن هناك trend، نستخدم price_change_percentage من البيانات
-                                if (item.price_change_percentage !== undefined && item.price_change_percentage !== null) {
-                                    const percent = Number(item.price_change_percentage);
-                                    if (Math.abs(percent) < 0.01) {
-                                        return <span className="text-gray-400 font-bold">0.0%</span>;
-                                    }
-                                    
-                                    return (
-                                     <span className={`text-xs font-bold ${percent > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                         {percent > 0 ? '+' : ''}{percent.toFixed(1)}%
-                                     </span>
-                                    );
-                                }
-                                
-                                // إذا لم يكن هناك price_24h_ago، نحسبه من base_price
-                                if (basePrice > 0) {
-                                    const diff = buyPrice - basePrice;
-                                    if (Math.abs(diff) < 0.01) {
-                                        return <span className="text-gray-400 font-bold">0.0%</span>;
-                                    }
-                                    
-                                    const percent = (diff / basePrice) * 100;
-                                    
-                                    return (
-                                        <span className={`text-xs font-bold ${percent > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                            {percent > 0 ? '+' : ''}{percent.toFixed(1)}%
-                                        </span>
-                                    );
-                                }
-                                
-                                // إذا لم يكن هناك base_price، نستخدم price_change_percentage من البيانات
-                                if (item.price_change_percentage !== undefined && item.price_change_percentage !== null) {
-                                    const percent = Number(item.price_change_percentage);
-                                    if (Math.abs(percent) < 0.01) {
-                                        return <span className="text-gray-400 font-bold">0.0%</span>;
-                                    }
-                                    
-                                    return (
-                                        <span className={`text-xs font-bold ${percent > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                            {percent > 0 ? '+' : ''}{percent.toFixed(1)}%
-                                        </span>
-                                    );
-                                }
-                                
-                                return <span className="text-gray-400 font-bold">0.0%</span>;
-                            })()}
-                          </TableCell>
+                        {/* Rows for Items under Category */}
+                        {isExpanded && items.map((item, index) => {
+                          const itemName = item.catalog_item?.name || item.product?.name || item.product_id;
+                          const buyPrice = item.buy_price || 0;
+                          const sellPrice = item.sell_price || 0;
+                          const basePrice = item.base_price || 0;
+                          
+                          return (
+                            <TableRow key={`${item.id}-${index}`} className="hover:bg-blue-50/20 transition-all border-l-4 border-l-blue-200 bg-white shadow-soft">
+                              <TableCell className="text-center text-gray-300 font-mono text-xs">{catIndex + 1}.{index + 1}</TableCell>
+                              <TableCell className="font-semibold text-gray-800">
+                                <div className="flex flex-col">
+                                  <span className="flex items-center gap-2">
+                                    <Box className="w-3.5 h-3.5 text-gray-400" />
+                                    {itemName}
+                                  </span>
+                                  <div className="flex items-center gap-2 mt-1 mr-5">
+                                    <span className="text-[9px] bg-slate-100 text-slate-600 px-1 py-0.5 rounded border border-slate-200">
+                                      {item.catalog_item?.waste_no || '---'}
+                                    </span>
+                                    <span className="text-[10px] text-primary/70 font-medium">
+                                      {item.catalog_item?.sub_category?.name || item.subcategory?.name || 'عام'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center font-bold text-gray-400">
+                                {basePrice.toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <div className="flex flex-col items-center">
+                                  <span className="text-lg font-bold text-primary">{buyPrice.toLocaleString()}</span>
+                                  <span className="text-[9px] font-bold text-gray-400">ج.م / كج</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center bg-blue-50/10">
+                                <div className="flex flex-col items-center">
+                                  <span className="text-base font-bold text-blue-700">{sellPrice ? sellPrice.toLocaleString() : '-'}</span>
+                                  <span className="text-[9px] font-bold text-blue-400">ج.م / طن</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                 {/* Market Indicator */}
+                                 {(() => {
+                                   const trend = trends.find(t => {
+                                      const trendId = String(t.stock_exchange_id);
+                                      const itemId = String(item.id);
+                                      const matchById = trendId === itemId;
+                                      
+                                      const trendProductId = String(t.product_id);
+                                      const itemProductId = String(item.product_id);
+                                      const matchByProductId = trendProductId && itemProductId && 
+                                                               trendProductId === itemProductId;
+                                      
+                                      return matchById || matchByProductId;
+                                    });
 
-                         <TableCell className="text-center text-xs text-gray-400">
-                             {item.last_update ? format(new Date(item.last_update), 'MMM d, p', { locale: ar }) : '-'}
-                         </TableCell>
-
-                         <TableCell className="text-center">
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="h-8 gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary transition-all duration-300 shadow-sm"
-                              onClick={() => openCalculator(item)}
-                            >
-                              <Calculator className="w-3.5 h-3.5" /> 
-                              <span className="text-xs font-bold">تسعير ذكي</span>
-                            </Button>
-                         </TableCell>
-                       </TableRow>
-                     );
+                                    if (trend && trend.market_price) {
+                                       return (
+                                          <div className="flex flex-col items-center">
+                                             <div className="flex items-center gap-1">
+                                                <TrendingUp className="w-3 h-3 text-green-500" />
+                                                <span className="text-sm font-bold text-gray-700">{Number(trend.market_price).toLocaleString()}</span>
+                                             </div>
+                                             <span className="text-[8px] text-gray-400">سعر البورصة اليوم</span>
+                                          </div>
+                                       );
+                                    }
+                                    return <span className="text-gray-300">---</span>;
+                                 })()}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {(() => {
+                                    const trend = trends.find(t => {
+                                      const trendId = String(t.stock_exchange_id);
+                                      const itemId = String(item.id);
+                                      const matchById = trendId === itemId;
+                                      
+                                      const trendProductId = String(t.product_id);
+                                      const itemProductId = String(item.product_id);
+                                      const matchByProductId = trendProductId && itemProductId && 
+                                                               trendProductId === itemProductId;
+                                      
+                                      return matchById || matchByProductId;
+                                    });
+                                    
+                                    // استخدام last_actual_purchase_price (آخر سعر تم الشراء به فعلياً) كسعر مرجعي
+                                    // هذا يعطي نسبة تغير دقيقة للعميل مقارنة بآخر عملية شراء فعلية
+                                    let price24hAgo = 0;
+                                    
+                                    if (trend && trend.price_24h_ago) {
+                                        price24hAgo = Number(trend.price_24h_ago) || 0;
+                                    }
+                                    
+                                    // إذا لم يكن هناك trend أو price_24h_ago = 0، نستخدم base_price كسعر مرجعي
+                                    if (price24hAgo === 0 && basePrice > 0) {
+                                        price24hAgo = basePrice;
+                                    }
+                                    
+                                    // حساب نسبة التغير بين السعر الحالي والسعر المرجعي
+                                    if (price24hAgo > 0) {
+                                        const diff = buyPrice - price24hAgo;
+                                        if (Math.abs(diff) < 0.01) {
+                                            return <span className="text-gray-400 font-bold">0.0%</span>;
+                                        }
+                                        
+                                        const percent = (diff / price24hAgo) * 100;
+                                        
+                                        return (
+                                            <span className={`text-xs font-bold ${percent > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                                {percent > 0 ? '+' : ''}{percent.toFixed(1)}%
+                                            </span>
+                                        );
+                                    }
+                                    
+                                    // إذا لم يكن هناك trend، نستخدم price_change_percentage من البيانات
+                                    if (item.price_change_percentage !== undefined && item.price_change_percentage !== null) {
+                                        const percent = Number(item.price_change_percentage);
+                                        if (Math.abs(percent) < 0.01) {
+                                            return <span className="text-gray-400 font-bold">0.0%</span>;
+                                        }
+                                        
+                                        return (
+                                         <span className={`text-xs font-bold ${percent > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                             {percent > 0 ? '+' : ''}{percent.toFixed(1)}%
+                                         </span>
+                                        );
+                                    }
+                                    
+                                    return <span className="text-gray-400 font-bold">0.0%</span>;
+                                })()}
+                              </TableCell>
+                              <TableCell className="text-center text-xs text-gray-400">
+                                  {item.last_update ? format(new Date(item.last_update), 'MMM d, p', { locale: ar }) : '-'}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="h-8 gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary transition-all duration-300 shadow-sm"
+                                  onClick={() => openCalculator(item)}
+                                >
+                                  <Calculator className="w-3.5 h-3.5" /> 
+                                  <span className="text-xs font-bold">تسعير ذكي</span>
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
                   })}
                 </TableBody>
               </Table>

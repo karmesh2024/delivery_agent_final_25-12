@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { FiX } from 'react-icons/fi';
 import { cn } from '@/lib/utils';
 
@@ -24,16 +25,66 @@ export function CustomDialog({
   footer
 }: CustomDialogProps) {
 
-  // منع تمرير الجسم عندما تكون النافذة مفتوحة
+  // منع تمرير الجسم وإخفاء الـ sidebars عند فتح الـ dialog
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      // إضافة class للـ body لإخفاء الـ sidebars عبر CSS
+      document.body.classList.add('dialog-open');
+      
+      // إخفاء جميع الـ sidebars مباشرة
+      const hideSidebars = () => {
+        // البحث عن جميع العناصر التي قد تكون sidebars
+        const allDivs = document.querySelectorAll('div');
+        allDivs.forEach((div) => {
+          const element = div as HTMLElement;
+          const classes = element.className || '';
+          const text = element.textContent || '';
+          
+          // التحقق من أن العنصر هو sidebar
+          const isSidebar = (
+            (classes.includes('flex') && classes.includes('flex-col') && classes.includes('h-screen')) ||
+            (classes.includes('bg-black') && text.includes('DeliveryApp')) ||
+            (text.includes('DeliveryApp') && text.includes('MAIN MENU')) ||
+            (text.includes('Toggle Sidebar') && classes.includes('bg-black'))
+          );
+          
+          if (isSidebar && !element.dataset.dialogHidden) {
+            element.dataset.dialogHidden = 'true';
+            element.style.display = 'none';
+          }
+        });
+      };
+      
+      // تنفيذ فوراً وبعد تأخير صغير للتأكد
+      hideSidebars();
+      const timeoutId = setTimeout(hideSidebars, 100);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        document.body.style.overflow = '';
+        document.body.classList.remove('dialog-open');
+        
+        // إعادة عرض جميع الـ sidebars
+        const hiddenElements = document.querySelectorAll('[data-dialog-hidden="true"]');
+        hiddenElements.forEach((el) => {
+          const element = el as HTMLElement;
+          element.style.display = '';
+          delete element.dataset.dialogHidden;
+        });
+      };
     } else {
       document.body.style.overflow = '';
+      document.body.classList.remove('dialog-open');
+      
+      // إعادة عرض جميع الـ sidebars
+      const hiddenElements = document.querySelectorAll('[data-dialog-hidden="true"]');
+      hiddenElements.forEach((el) => {
+        const element = el as HTMLElement;
+        element.style.display = '';
+        delete element.dataset.dialogHidden;
+      });
     }
-    return () => {
-      document.body.style.overflow = '';
-    };
   }, [isOpen]);
 
   // إغلاق النافذة عند الضغط على مفتاح Escape
@@ -53,36 +104,61 @@ export function CustomDialog({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) {
-    return null;
-  }
-
   // منع انتشار الأحداث من النافذة إلى الخلفية
   const handleContentClick = (e: React.MouseEvent) => {
     e.stopPropagation();
   };
 
-  return (
+  if (!isOpen) {
+    return null;
+  }
+
+  const dialogContent = (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      className="fixed inset-0 flex items-center justify-center p-4"
       data-state={isOpen ? 'open' : 'closed'}
+      style={{ 
+        zIndex: 999999,
+        isolation: 'isolate',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        pointerEvents: 'auto'
+      }}
     >
       {/* طبقة خلفية سوداء شفافة */}
       <div
         className="fixed inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
+        style={{ 
+          zIndex: 999999,
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          pointerEvents: 'auto'
+        }}
       />
 
       {/* محتوى النافذة */}
       <div
         className={cn(
-          "relative bg-white rounded-lg shadow-2xl w-full max-w-4xl z-[10000]",
+          "relative bg-white rounded-lg shadow-2xl w-full max-w-4xl",
           "max-h-[90vh] min-h-[300px] flex flex-col overflow-hidden",
           className
         )}
         onClick={handleContentClick}
         onKeyDown={(e) => e.stopPropagation()}
+        style={{ 
+          zIndex: 1000000, 
+          isolation: 'isolate',
+          position: 'relative',
+          pointerEvents: 'auto'
+        }}
       >
         {/* رأس النافذة الثابت */}
         <div className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
@@ -112,10 +188,8 @@ export function CustomDialog({
         </div>
 
         {/* محتوى النافذة الديناميكي - قابل للتمرير */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 py-4">
-          <div className="min-h-0">
-            {children}
-          </div>
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-6 py-4">
+          {children}
         </div>
 
         {/* تذييل النافذة الثابت */}
@@ -127,6 +201,14 @@ export function CustomDialog({
       </div>
     </div>
   );
+
+  // استخدام Portal لعرض الـ dialog مباشرة في document.body
+  // هذا يضمن أن الـ dialog يظهر فوق جميع العناصر بما فيها الـ Sidebar
+  if (typeof document !== 'undefined' && isOpen) {
+    return createPortal(dialogContent, document.body);
+  }
+
+  return null;
 }
 
 // مكون التذييل لأزرار النافذة

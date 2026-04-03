@@ -17,9 +17,10 @@ export const useSidebar = () => useContext(SidebarContext);
 interface DashboardLayoutProps {
   children: React.ReactNode;
   title?: string;
+  hideSidebar?: boolean;
 }
 
-export function DashboardLayout({ children, title = "Dashboard" }: DashboardLayoutProps) {
+export function DashboardLayout({ children, title = "Dashboard", hideSidebar = false }: DashboardLayoutProps) {
   // حالة لتتبع ما إذا كان الشريط الجانبي موسعًا أم مطويًا
   const [isExpanded, setIsExpanded] = useState(true);
   // حالة لتتبع ما إذا كان المكون قد تم تحميله في المتصفح
@@ -34,12 +35,14 @@ export function DashboardLayout({ children, title = "Dashboard" }: DashboardLayo
   return (
     <SidebarContext.Provider value={{ isExpanded, toggleSidebar }}>
       <div className="flex h-screen bg-background text-foreground">
-        <ClientOnly>
-          <Sidebar />
-        </ClientOnly>
+        {!hideSidebar && (
+          <ClientOnly>
+            <Sidebar />
+          </ClientOnly>
+        )}
         
         {/* Main Content Area */}
-        <div className="flex flex-col flex-1 overflow-y-auto p-6">
+        <div className={`flex flex-col flex-1 overflow-y-auto ${hideSidebar ? 'p-0' : 'p-6'}`}>
           {/* Header at the top with bottom margin */}
           <div className="mb-6">
             <Header title={title} />

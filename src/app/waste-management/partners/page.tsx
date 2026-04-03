@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/shared/layouts/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
-import { Briefcase, ClipboardList, TrendingUp, Handshake } from 'lucide-react';
+import { Briefcase, ClipboardList, TrendingUp, Handshake, BarChart3 } from 'lucide-react';
 
 export default function IndustrialPartnersHubPage() {
   const router = useRouter();
@@ -21,28 +21,36 @@ export default function IndustrialPartnersHubPage() {
       btnColor: 'bg-blue-600 hover:bg-blue-700'
     },
     {
-      title: 'طلبات الشراء الواردة',
-      description: 'متابعة طلبات المصانع لتوريد المواد الخام وحالاتها',
+      title: 'طلبات وتوريدات المصانع',
+      description: 'متابعة طلبات السوق الفورية وعقود التوريد وحالات التنفيذ',
       icon: <ClipboardList className="w-6 h-6 text-orange-600" />,
-      actionText: 'إدارة الطلبات',
-      actionUrl: '/waste-management/partners/orders',
+      actionText: 'إدارة العمليات',
+      actionUrl: '/waste-management/partners/contracts',
       color: 'bg-orange-50 border-orange-100 text-orange-900',
       btnColor: 'bg-orange-600 hover:bg-orange-700'
     },
     {
-      title: 'العقود (قريباً)',
-      description: 'إدارة عقود التوريد طويلة الأمد والشروط المالية',
+      title: 'إدارة العقود والالتزامات',
+      description: 'اتفاقيات التوريد طويلة الأمد والشروط المالية والتشغيلية',
       icon: <Handshake className="w-6 h-6 text-purple-600" />,
       actionText: 'إدارة العقود',
-      actionUrl: '#',
+      actionUrl: '/waste-management/partners/contracts',
       color: 'bg-purple-50 border-purple-100 text-purple-900',
-      btnColor: 'bg-purple-600 hover:bg-purple-700',
-      disabled: true
+      btnColor: 'bg-purple-600 hover:bg-purple-700'
+    },
+    {
+      title: 'عروض البورصة والسوق',
+      description: 'تسجيل ومتابعة أسعار السوق والعروض الخارجية لتحديث البورصة اللحظية',
+      icon: <TrendingUp className="w-6 h-6 text-emerald-600" />,
+      actionText: 'إدارة العروض',
+      actionUrl: '/financial-management/exchange', // Or a dedicated page if preferred, but for now linking to the dashboard where the bids tab is
+      color: 'bg-emerald-50 border-emerald-100 text-emerald-900',
+      btnColor: 'bg-emerald-600 hover:bg-emerald-700'
     },
      {
       title: 'تقارير المبيعات (قريباً)',
       description: 'تحليل أداء المبيعات وحجم التوريد لكل شريك',
-      icon: <TrendingUp className="w-6 h-6 text-green-600" />,
+      icon: <BarChart3 className="w-6 h-6 text-green-600" />,
       actionText: 'عرض التقارير',
       actionUrl: '#',
       color: 'bg-green-50 border-green-100 text-green-900',

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/shared/layouts/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
-import { FiUsers, FiStar, FiGift, FiBriefcase, FiTrendingUp, FiActivity, FiRadio } from "react-icons/fi";
+import { FiUsers, FiStar, FiGift, FiBriefcase, FiTrendingUp, FiActivity, FiRadio, FiZap, FiLayers, FiLayout, FiTarget, FiGlobe, FiBook } from "react-icons/fi";
 import Link from "next/link";
 import { useAppDispatch, useAppSelector } from '@/store';
 import { fetchMemberships, fetchPartners, fetchRewards, fetchPointsTransactions } from '@/domains/club-zone/store/clubZoneSlice';
@@ -31,12 +31,19 @@ export default function ClubZoneDashboardPage() {
 
   useEffect(() => {
     const loadSettlementDue = async () => {
+      if (!supabase) return; // Check if supabase is initialized
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        // If no session, we can't check settlement due for the current user
+        setIsSettlementDue(false);
+        return;
+      }
       try {
         const { data, error } = await supabase.rpc('check_monthly_settlement_due');
         if (error) throw error;
         setIsSettlementDue(Boolean(data));
       } catch {
-        // ignore banner if RPC is not available
+        // ignore banner if RPC is not available or other error
         setIsSettlementDue(false);
       }
     };
@@ -262,6 +269,145 @@ export default function ClubZoneDashboardPage() {
               </p>
             </CardContent>
           </Card>
+        </div>
+        
+        {/* Zoon Zone Control Room Section */}
+        <div className="pt-10 border-t border-gray-200">
+          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-slate-900">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <FiZap className="text-blue-600" />
+            </div>
+            غرفة تحكم نادي زوون (الغرف والدوائر)
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+            {/* إدارة الغرف والمحتوى */}
+            <Card className="border-blue-100 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg text-blue-700">
+                  <FiLayers className="mr-2" />
+                  إدارة الغرف والمحتوى
+                </CardTitle>
+                <CardDescription className="min-h-[40px]">
+                  تعميد الغرف الـ 8، إدارة المنشورات، وبنك الأسئلة الذكية
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/club-zone/rooms/management">
+                  <Button className="w-full bg-blue-700 hover:bg-blue-800 text-white">إدارة الغرف</Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* معاينة الغرف */}
+            <Card className="border-blue-50 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg text-blue-500">
+                  <FiLayout className="mr-2" />
+                  معاينة الغرف (ويب)
+                </CardTitle>
+                <CardDescription className="min-h-[40px]">
+                  استعراض الغرف والمنشورات والأسئلة من منظور المستخدم
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/club-zone/rooms/preview">
+                  <Button variant="outline" className="w-full border-blue-200 text-blue-700 hover:bg-blue-50">فتح المعاينة</Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* إدارة الدوائر والعلاقات */}
+            <Card className="border-purple-100 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg text-purple-700">
+                  <FiTarget className="mr-2" />
+                  إدارة الدوائر والعلاقات
+                </CardTitle>
+                <CardDescription className="min-h-[40px]">
+                  ضبط محرك المطابقة، أوزان الشخصية، وإدارة موارد الدوائر
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/club-zone/circles/management">
+                  <Button className="w-full bg-purple-700 hover:bg-purple-800 text-white">إدارة الدوائر</Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* معاينة الدوائر الكونية */}
+            <Card className="border-purple-50 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg text-purple-500">
+                  <FiGlobe className="mr-2" />
+                  المعاينة الكونية (Cosmic)
+                </CardTitle>
+                <CardDescription className="min-h-[40px]">
+                  استعراض الفضاء الكوني التفاعلي والروابط بين الأعضاء
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/club-zone/circles/preview">
+                  <Button variant="outline" className="w-full border-purple-200 text-purple-700 hover:bg-purple-50">فتح الفضاء الكوني</Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* الملف النفسي والذكاء الاصطناعي */}
+            <Card className="border-indigo-100 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg text-indigo-700">
+                  <FiActivity className="mr-2" />
+                  الملف النفسي (AI)
+                </CardTitle>
+                <CardDescription className="min-h-[40px]">
+                  تحليل الشخصية، الاستبيان الأولي، ومحرك التوجيه الذكي
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/club-zone/profile">
+                  <Button className="w-full bg-indigo-700 hover:bg-indigo-800 text-white">إظهار ملفي النفسي</Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* مطابقة الدوائر الذكية */}
+            <Card className="border-indigo-100 shadow-sm hover:shadow-md transition-all duration-300 border-dashed">
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg text-indigo-600">
+                  <FiZap className="mr-2" />
+                  مقترحات الدوائر (AI)
+                </CardTitle>
+                <CardDescription className="min-h-[40px]">
+                  معاينة نظام المطابقة وكيفية ظهور الدوائر المقترحة للمستخدمين
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/club-zone/rooms/preview/proposals">
+                  <Button variant="outline" className="w-full border-indigo-200 text-indigo-700 hover:bg-indigo-50">معاينة المقترحات</Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* قاموس الذكاء الاصطناعي (NLP) */}
+            <Card className="border-slate-800 shadow-lg hover:shadow-xl transition-all duration-300 bg-slate-900 text-white">
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg text-indigo-400">
+                  <FiBook className="mr-2" />
+                  قاموس الذكاء الاصطناعي (NLP)
+                </CardTitle>
+                <CardDescription className="min-h-[40px] text-slate-400">
+                  إدارة الكلمات المفتاحية التي تحلل سلوك وشخصية المستخدمين
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/admin/ai-settings/dictionary">
+                  <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white border-none shadow-md">إدارة الكلمات</Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+
         </div>
 
         {loading && (

@@ -1,22 +1,11 @@
-"use client";
+import { redirect } from 'next/navigation';
 
-import { SubCategoriesListPage } from '@/domains/product-categories';
-import { useParams } from 'next/navigation';
-
-export default function Page() {
-  const params = useParams();
-  
-  const categoryId = params && params.categoryId 
-    ? (Array.isArray(params.categoryId) ? params.categoryId[0] : params.categoryId as string)
-    : '';
-  
-  if (!categoryId) {
-    return <div className="p-6 text-center">لم يتم العثور على معرف الفئة</div>;
-  }
-  
-  return (
-    <SubCategoriesListPage categoryId={categoryId} />
-  );
+/** إعادة توجيه إلى المصدر الموحد إدارة الفئات والمنتجات */
+export default async function WasteSubcategoryByIdRedirect({
+  params,
+}: {
+  params: Promise<{ categoryId: string }>;
+}) {
+  const { categoryId } = await params;
+  redirect(`/product-categories/subcategories/${categoryId}`);
 }
-
-

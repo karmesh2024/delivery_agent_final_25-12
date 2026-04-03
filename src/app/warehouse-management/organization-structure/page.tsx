@@ -1,15 +1,15 @@
 'use client';
 
-import React from 'react';
-import { DashboardLayout } from '@/shared/layouts/DashboardLayout';
-import OrganizationStructurePage from '@/domains/warehouse-management/pages/OrganizationStructurePage';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function OrganizationStructureRoute() {
-  return (
-    <DashboardLayout title="إدارة التنظيم والتسلسل">
-      <OrganizationStructurePage />
-    </DashboardLayout>
-  );
+/** إعادة توجيه إلى الإدارة العامة - تم نقل إدارة التنظيم والتسلسل */
+export default function OrganizationStructureRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/general-management/organization-structure');
+  }, [router]);
+  return null;
 }
 
 

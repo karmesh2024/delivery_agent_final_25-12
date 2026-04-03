@@ -1,7 +1,16 @@
 import { fileURLToPath } from "url";
+import path from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // ✅ إعدادات Turbopack لحل مشكلة Workspace Root
+  turbopack: {
+    root: __dirname,
+  },
+
   // ✅ تفعيل الوضع الصارم في React للحماية من المشاكل
   reactStrictMode: true,
   
@@ -109,21 +118,8 @@ const nextConfig = {
       }
     ]
   },
-  webpack(config, { isServer }) {
-    // إضافة دعم للقماشة (canvas) لحل مشاكل التوافق مع Leaflet
-    config.externals = [...(config.externals || []), { canvas: "canvas" }];
-    
-    // Fix module resolution for TypeScript files
-    config.resolve = {
-      ...config.resolve,
-      extensions: ['.tsx', '.ts', '.jsx', '.js', '.json'],
-      extensionAlias: {
-        '.js': ['.tsx', '.ts', '.jsx', '.js'],
-      }
-    };
-    
-    return config;
-  },
+  
+  serverExternalPackages: ['canvas'],
 };
 
 export default nextConfig;

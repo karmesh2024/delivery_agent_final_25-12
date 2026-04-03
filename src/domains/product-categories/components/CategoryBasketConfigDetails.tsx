@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchCategoryBucketConfigsThunk, updateCategoryBucketConfigThunk } from '@/domains/product-categories/store/productCategoriesSlice';
+import { fetchCategoryBucketConfigsThunk } from '@/domains/product-categories/store/productCategoriesSlice';
 import { useToast } from '@/shared/ui/use-toast';
 import { Button } from '@/shared/ui/button';
 import { PlusIcon, Pencil, Trash2 } from 'lucide-react';
@@ -12,9 +12,15 @@ import {
   TableHeader,
   TableRow
 } from '@/shared/ui/table';
-import { UniversalDialog } from '@/shared/ui/universal-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/shared/components/ui/dialog';
 import { CategoryBasketConfigForm } from './CategoryBasketConfigForm';
-import { CategoryBucketConfig, deleteCategoryBucketConfig } from '@/domains/product-categories/api/basketConfigService';
+import { CategoryBucketConfig, deleteCategoryBucketConfig, getAgentsForBasketConfig, AgentForBasket } from '@/domains/product-categories/api/basketConfigService';
 
 interface CategoryBasketConfigDetailsProps {
   categoryId: string;
@@ -28,13 +34,27 @@ export const CategoryBasketConfigDetails: React.FC<CategoryBasketConfigDetailsPr
   const [editConfig, setEditConfig] = useState<CategoryBucketConfig | null>(null);
   const [deleteConfig, setDeleteConfig] = useState<CategoryBucketConfig | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [agents, setAgents] = useState<AgentForBasket[]>([]);
 
-  // Filter configurations relevant to the current categoryId
-  const filteredConfigs = categoryBucketConfigs.filter(config => config.category_id === categoryId);
+  const filteredConfigs = categoryBucketConfigs.filter(
+    (config) =>
+      config.category_id === categoryId ||
+      (config.waste_main_category_id != null && String(config.waste_main_category_id) === categoryId)
+  );
+
+  const getAgentName = (agentId: string | null) => {
+    if (!agentId) return 'الكل (لجميع الوكلاء)';
+    const a = agents.find((x) => x.id === agentId);
+    return a ? (a.full_name || a.email || a.id) : agentId;
+  };
 
   useEffect(() => {
     dispatch(fetchCategoryBucketConfigsThunk());
   }, [dispatch, categoryId]);
+
+  useEffect(() => {
+    getAgentsForBasketConfig().then(setAgents).catch(() => setAgents([]));
+  }, []);
 
   const handleDelete = async () => {
     if (!deleteConfig) return;
@@ -85,6 +105,7 @@ export const CategoryBasketConfigDetails: React.FC<CategoryBasketConfigDetailsPr
           <TableHeader>
             <TableRow>
               <TableHead className="text-right">نوع المورد</TableHead>
+              <TableHead className="text-right">اسم الوكيل</TableHead>
               <TableHead className="text-right">حجم السلة</TableHead>
               <TableHead className="text-right">الوزن الفارغ (كجم)</TableHead>
               <TableHead className="text-right">الحد الأقصى للوزن الصافي (كجم)</TableHead>
@@ -98,6 +119,7 @@ export const CategoryBasketConfigDetails: React.FC<CategoryBasketConfigDetailsPr
             {filteredConfigs.map((config: CategoryBucketConfig) => (
               <TableRow key={config.id}>
                 <TableCell>{config.supplier_type}</TableCell>
+                <TableCell>{config.supplier_type === 'AUTHORIZED_AGENT' ? getAgentName(config.agent_id ?? null) : '—'}</TableCell>
                 <TableCell>{config.basket_size}</TableCell>
                 <TableCell>{config.basket_empty_weight_kg}</TableCell>
                 <TableCell>{config.max_net_weight_kg}</TableCell>
@@ -128,45 +150,48 @@ export const CategoryBasketConfigDetails: React.FC<CategoryBasketConfigDetailsPr
         </Table>
       )}
 
-      <UniversalDialog
-        isOpen={isAddConfigDialogOpen}
-        onClose={() => setIsAddConfigDialogOpen(false)}
-        title="إضافة إعدادات سلة جديدة"
-        description="أدخل معلومات إعدادات السلة الجديدة للفئة الرئيسية."
-      >
-        <CategoryBasketConfigForm
-          categoryId={categoryId}
-          onClose={() => setIsAddConfigDialogOpen(false)}
-        />
-      </UniversalDialog>
-
-      <UniversalDialog
-        isOpen={!!editConfig}
-        onClose={() => setEditConfig(null)}
-        title="تعديل إعدادات السلة"
-        description="يمكنك تعديل بيانات التكوين ثم الحفظ."
-      >
-        {editConfig && (
+      <Dialog open={isAddConfigDialogOpen} onOpenChange={(open) => !open && setIsAddConfigDialogOpen(false)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>إضافة إعدادات سلة جديدة</DialogTitle>
+            <DialogDescription>أدخل معلومات إعدادات السلة الجديدة للفئة الرئيسية.</DialogDescription>
+          </DialogHeader>
           <CategoryBasketConfigForm
             categoryId={categoryId}
-            onClose={() => setEditConfig(null)}
-            initialConfig={editConfig}
-            isEdit={true}
+            onClose={() => setIsAddConfigDialogOpen(false)}
           />
-        )}
-      </UniversalDialog>
+        </DialogContent>
+      </Dialog>
 
-      <UniversalDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
-        title="تأكيد الحذف"
-        description="هل أنت متأكد أنك تريد حذف هذا التكوين؟ لا يمكن التراجع عن هذه العملية."
-      >
-        <div className="flex justify-end gap-2 mt-4">
-          <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>إلغاء</Button>
-          <Button variant="destructive" onClick={handleDelete}>تأكيد الحذف</Button>
-        </div>
-      </UniversalDialog>
+      <Dialog open={!!editConfig} onOpenChange={(open) => !open && setEditConfig(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>تعديل إعدادات السلة</DialogTitle>
+            <DialogDescription>يمكنك تعديل بيانات التكوين ثم الحفظ.</DialogDescription>
+          </DialogHeader>
+          {editConfig && (
+            <CategoryBasketConfigForm
+              categoryId={categoryId}
+              onClose={() => setEditConfig(null)}
+              initialConfig={editConfig}
+              isEdit={true}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={(open) => !open && setDeleteConfig(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>تأكيد الحذف</DialogTitle>
+            <DialogDescription>هل أنت متأكد أنك تريد حذف هذا التكوين؟ لا يمكن التراجع عن هذه العملية.</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>إلغاء</Button>
+            <Button variant="destructive" onClick={handleDelete}>تأكيد الحذف</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }; 

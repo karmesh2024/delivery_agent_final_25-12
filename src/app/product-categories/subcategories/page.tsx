@@ -16,7 +16,7 @@ const SubcategoriesContent: React.FC = () => {
     );
   }
 
-  return <SubCategoriesListPage categoryId={categoryId} />;
+  return <SubCategoriesListPage categoryId={categoryId} viewOnly />;
 };
 
 const SubcategoriesPage: React.FC = () => {

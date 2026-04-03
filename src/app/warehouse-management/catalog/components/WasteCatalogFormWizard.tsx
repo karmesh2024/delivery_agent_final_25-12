@@ -24,6 +24,7 @@ import {
   PlasticType, 
   MetalType 
 } from '@/services/wasteCatalogService';
+import { categoryService } from '@/domains/product-categories/api/categoryService';
 import { Wizard } from '@/shared/components/Wizard';
 import { uploadFile, getPublicImageUrl, supabase } from '@/lib/supabase';
 
@@ -397,12 +398,15 @@ export default function WasteCatalogFormWizard({ wasteId, initialData }: WasteCa
         setPlasticTypes(plasticTypesData);
         setMetalTypes(metalTypesData);
         
-        // تحميل الفئات الرئيسية للمخلفات (سيتم تحديثها عند اختيار القطاع)
-        // إذا كان هناك قطاع محدد مسبقاً في initialData، فلن يتم تحميل الفئات هنا
-        // لأن useEffect الخاص بالقطاع سيتولى ذلك
-        if (!initialData?.sector_id) {
-          const wasteMainCategoriesData = await wasteCatalogService.getWasteMainCategories();
-          setWasteMainCategories(wasteMainCategoriesData);
+        // تحميل الفئات الرئيسية من نفس مصدر إدارة الفئات والمنتجات (waste_main_categories)
+        const { data: categoriesData } = await categoryService.getCategories();
+        if (categoriesData?.length) {
+          const mapped: WasteMainCategory[] = categoriesData.map((c) => ({
+            id: Number(c.id),
+            code: c.code ?? String(c.id),
+            name: c.name,
+          }));
+          setWasteMainCategories(mapped);
         }
         
       } catch (error) {
@@ -416,15 +420,27 @@ export default function WasteCatalogFormWizard({ wasteId, initialData }: WasteCa
     loadData();
   }, []);
 
-  // تحميل الفئات الفرعية عند تغيير الفئة الرئيسية
+  // تحميل الفئات الفرعية من نفس مصدر إدارة الفئات والمنتجات (waste_sub_categories)
   useEffect(() => {
     const loadSubCategories = async () => {
       if (formData.main_category_id) {
         try {
-          const subCategoriesData = await wasteCatalogService.getWasteSubCategories(formData.main_category_id);
-          setWasteSubCategories(subCategoriesData);
+          const mainId = String(formData.main_category_id);
+          const { data: subData } = await categoryService.getSubCategories(mainId);
+          if (subData?.length) {
+            const mapped: WasteSubCategory[] = subData.map((s) => ({
+              id: Number(s.id),
+              code: s.code ?? String(s.id),
+              name: s.name,
+              main_id: s.category_id ? Number(s.category_id) : null,
+            }));
+            setWasteSubCategories(mapped);
+          } else {
+            setWasteSubCategories([]);
+          }
         } catch (error) {
           console.error('خطأ في تحميل الفئات الفرعية:', error);
+          setWasteSubCategories([]);
         }
       } else {
         setWasteSubCategories([]);
@@ -494,14 +510,18 @@ export default function WasteCatalogFormWizard({ wasteId, initialData }: WasteCa
           // إعادة تعيين نوع العميل عند تغيير القطاع
           handleFormChange('client_type_id', null);
 
-          // تحميل الفئات الأساسية المرتبطة بهذا القطاع
-          console.log('🔍 جلب الفئات الأساسية للقطاع:', sectorUUID, 'من القائمة:', sectors.length);
-          const mainCategoriesData = await wasteCatalogService.getWasteMainCategories(sectorUUID);
-          console.log('📋 الفئات الأساسية المستلمة:', mainCategoriesData);
-          setWasteMainCategories(mainCategoriesData);
-          
-          if (mainCategoriesData.length === 0) {
-            toast.warning('لا توجد فئات أساسية مرتبطة بهذا القطاع. تأكد من وجود تصنيفات وفئات في إدارة التنظيم والتسلسل.');
+          // تحميل الفئات الأساسية من نفس مصدر إدارة الفئات والمنتجات (waste_main_categories)
+          const { data: categoriesData } = await categoryService.getCategories();
+          if (categoriesData?.length) {
+            const mapped: WasteMainCategory[] = categoriesData.map((c: any) => ({
+              id: Number(c.id),
+              code: c.code ?? String(c.id),
+              name: c.name,
+            }));
+            setWasteMainCategories(mapped);
+          } else {
+            setWasteMainCategories([]);
+            toast.warning('لا توجد فئات أساسية. أضف فئات من إدارة الفئات والمنتجات.');
           }
           
           // إعادة تعيين الفئات عند تغيير القطاع
@@ -516,9 +536,18 @@ export default function WasteCatalogFormWizard({ wasteId, initialData }: WasteCa
         setClientTypes([]);
         handleFormChange('client_type_id', null);
         
-        // تحميل جميع الفئات الأساسية إذا لم يتم اختيار قطاع
-        wasteCatalogService.getWasteMainCategories().then(data => {
-          setWasteMainCategories(data);
+        // تحميل جميع الفئات الأساسية من إدارة الفئات والمنتجات
+        categoryService.getCategories().then(({ data: categoriesData }) => {
+          if (categoriesData?.length) {
+            const mapped: WasteMainCategory[] = categoriesData.map((c: any) => ({
+              id: Number(c.id),
+              code: c.code ?? String(c.id),
+              name: c.name,
+            }));
+            setWasteMainCategories(mapped);
+          } else {
+            setWasteMainCategories([]);
+          }
         });
         
         // إعادة تعيين الفئات
@@ -920,7 +949,7 @@ export default function WasteCatalogFormWizard({ wasteId, initialData }: WasteCa
     });
     setShowMainCategoryDialog(false);
     // يمكن إضافة redirect لاحقاً إذا لزم الأمر
-    // router.push('/warehouse-management/organization-structure');
+    // router.push('/general-management/organization-structure');
   };
 
   const handleAddWasteSubCategory = async () => {
@@ -930,7 +959,7 @@ export default function WasteCatalogFormWizard({ wasteId, initialData }: WasteCa
     });
     setShowSubCategoryDialog(false);
     // يمكن إضافة redirect لاحقاً إذا لزم الأمر
-    // router.push('/warehouse-management/organization-structure');
+    // router.push('/general-management/organization-structure');
   };
 
   const canGoNext = () => {

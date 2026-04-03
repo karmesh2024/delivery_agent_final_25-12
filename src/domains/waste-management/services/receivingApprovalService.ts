@@ -64,7 +64,7 @@ export const receivingApprovalService = {
         return null;
       }
 
-      const receivingRequest: any = {
+      const receivingRequest: Partial<ReceivingApprovalRequest> = {
         source: request.source,
         warehouse_id: request.warehouse_id,
         waste_items: request.waste_items,
@@ -88,7 +88,8 @@ export const receivingApprovalService = {
 
       console.log('Inserting request:', receivingRequest);
 
-      const { data, error } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { data, error } = await supabase
         .from('waste_receiving_approval_requests')
         .insert([receivingRequest])
         .select()
@@ -103,9 +104,10 @@ export const receivingApprovalService = {
       console.log('Request created successfully:', data);
       toast.success('تم إنشاء طلب الاستلام بنجاح');
       return data as ReceivingApprovalRequest;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('خطأ في إنشاء طلب الاستلام:', error);
-      toast.error(`حدث خطأ أثناء إنشاء طلب الاستلام: ${error?.message || 'خطأ غير معروف'}`);
+      const errorMessage = error instanceof Error ? error.message : 'خطأ غير معروف';
+      toast.error(`حدث خطأ أثناء إنشاء طلب الاستلام: ${errorMessage}`);
       return null;
     }
   },
@@ -132,7 +134,8 @@ export const receivingApprovalService = {
         return false;
       }
 
-      const { error } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { error } = await supabase
         .from('waste_receiving_approval_requests')
         .update({
           status: 'verified',
@@ -174,7 +177,8 @@ export const receivingApprovalService = {
       }
 
       // جلب طلب الاستلام
-      const { data: request, error: fetchError } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { data: request, error: fetchError } = await supabase
         .from('waste_receiving_approval_requests')
         .select('*')
         .eq('id', requestId)
@@ -187,7 +191,8 @@ export const receivingApprovalService = {
       }
 
       // تحديث حالة الطلب
-      const { error: updateError } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { error: updateError } = await supabase
         .from('waste_receiving_approval_requests')
         .update({
           status: 'approved',
@@ -215,7 +220,8 @@ export const receivingApprovalService = {
 
       // جلب معلومات المخلفات من catalog_waste_materials للحصول على category_id و subcategory_id
       const wasteMaterialIds = wasteItems.map(item => item.waste_material_id);
-      const { data: catalogWasteMaterials, error: catalogError } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { data: catalogWasteMaterials, error: catalogError } = await supabase
         .from('catalog_waste_materials')
         .select('waste_no, main_category_id, sub_category_id, notes')
         .in('waste_no', wasteMaterialIds);
@@ -249,7 +255,8 @@ export const receivingApprovalService = {
           let catalogWasteId: number | null = null;
           if (catalogWaste) {
             // البحث عن catalog_waste_materials.id من waste_no
-            const { data: catalogWasteData } = await supabase!
+            if (!supabase) throw new Error('Supabase client is not initialized');
+            const { data: catalogWasteData } = await supabase
               .from('catalog_waste_materials')
               .select('id')
               .eq('waste_no', item.waste_material_id)
@@ -266,7 +273,8 @@ export const receivingApprovalService = {
           let productId: string | null = null;
           
           // الطريقة 1: البحث باستخدام name = waste_no مباشرة
-          const { data: wasteDataDirect, error: directError } = await supabase!
+          if (!supabase) throw new Error('Supabase client is not initialized');
+          const { data: wasteDataDirect, error: directError } = await supabase
             .from('waste_data_admin')
             .select('id, name')
             .eq('name', item.waste_material_id)
@@ -278,7 +286,8 @@ export const receivingApprovalService = {
             console.log(`تم العثور على waste_data_admin للمخلف ${item.waste_material_id}: ${productId}`);
           } else {
             // الطريقة 2: البحث باستخدام name يحتوي على waste_no
-            const { data: wasteDataPartial, error: partialError } = await supabase!
+            if (!supabase) throw new Error('Supabase client is not initialized');
+            const { data: wasteDataPartial, error: partialError } = await supabase
               .from('waste_data_admin')
               .select('id, name')
               .ilike('name', `%${item.waste_material_id}%`)
@@ -290,7 +299,8 @@ export const receivingApprovalService = {
               console.log(`تم العثور على waste_data_admin للمخلف ${item.waste_material_id} (بحث جزئي): ${productId}`);
             } else {
               // الطريقة 3: البحث باستخدام description
-              const { data: wasteDataDesc, error: descError } = await supabase!
+              if (!supabase) throw new Error('Supabase client is not initialized');
+              const { data: wasteDataDesc, error: descError } = await supabase
                 .from('waste_data_admin')
                 .select('id, name, description')
                 .or(`name.ilike.%${item.waste_material_id}%,description.ilike.%${item.waste_material_id}%`)
@@ -309,8 +319,8 @@ export const receivingApprovalService = {
 
           // جلب category_id و subcategory_id من catalog_waste_materials
           // ثم البحث عن UUIDs من categories و subcategories
-          let categoryId: string | null = null;
-          let subcategoryId: string | null = null;
+          const categoryId: string | null = null;
+          const subcategoryId: string | null = null;
 
           if (catalogWaste) {
             // إذا كان هناك main_category_id، نحتاج للبحث عن category_id المقابل
@@ -319,7 +329,7 @@ export const receivingApprovalService = {
           }
 
           // إضافة حركة المخزون
-          const movementData: any = {
+          const movementData: Record<string, unknown> = {
             warehouse_id: request.warehouse_id,
             product_id: productId, // قد يكون null إذا لم نجد waste_data_admin
             catalog_waste_id: catalogWasteId, // ✅ إضافة catalog_waste_id للربط المباشر
@@ -334,7 +344,8 @@ export const receivingApprovalService = {
             created_by: approverId,
           };
 
-          const { error: movementError } = await supabase!
+          if (!supabase) throw new Error('Supabase client is not initialized');
+          const { error: movementError } = await supabase
             .from('inventory_movements')
             .insert([movementData]);
 
@@ -353,7 +364,7 @@ export const receivingApprovalService = {
       // إذا كانت هناك أخطاء، نعرض تحذير لكن لا نوقف العملية
       if (movementErrors.length > 0) {
         console.warn('تحذير: فشل في إضافة بعض حركات المخزون:', movementErrors);
-        toast.warn(`تمت الموافقة، لكن حدثت أخطاء في تحديث المخزون لبعض المخلفات: ${movementErrors.length}`);
+        toast.warning(`تمت الموافقة، لكن حدثت أخطاء في تحديث المخزون لبعض المخلفات: ${movementErrors.length}`);
       } else {
         toast.success('تمت الموافقة على استلام المخلفات وتحديث المخزون بنجاح');
       }
@@ -380,7 +391,8 @@ export const receivingApprovalService = {
         return false;
       }
 
-      const { error } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { error } = await supabase
         .from('waste_receiving_approval_requests')
         .update({
           status: 'rejected',
@@ -414,7 +426,8 @@ export const receivingApprovalService = {
         return [];
       }
 
-      const { data, error } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { data, error } = await supabase
         .from('waste_receiving_approval_requests')
         .select('*')
         .in('status', ['pending_verification', 'verified'])

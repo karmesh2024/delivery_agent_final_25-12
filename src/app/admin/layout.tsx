@@ -3,12 +3,15 @@
 import { DashboardLayout } from "@/shared/layouts/DashboardLayout";
 import React from "react";
 
+import { usePathname } from "next/navigation";
+
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
-  // يمكنك هنا تحديد عنوان افتراضي لمجموعة صفحات الأدمن إذا أردت
-  // أو تمرير العنوان ديناميكيًا من الصفحات الفرعية
-  return <DashboardLayout title="Admin Panel">{children}</DashboardLayout>;
+  const pathname = usePathname();
+  const isAiSettings = pathname?.startsWith('/admin/ai-settings');
+
+  return <DashboardLayout title="Admin Panel" hideSidebar={isAiSettings}>{children}</DashboardLayout>;
 } 

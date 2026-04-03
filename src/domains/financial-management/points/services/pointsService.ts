@@ -12,6 +12,7 @@ import {
   PointsValueHistory,
   PointsReport,
   PointsSummary,
+  ProductInSubcategory,
 } from '../types';
 
 export const pointsService = {
@@ -31,6 +32,10 @@ export const pointsService = {
             id,
             name
           )
+        ),
+        waste_data_admin:product_id (
+          id,
+          name
         )
       `)
       .order('created_at', { ascending: false });
@@ -41,6 +46,7 @@ export const pointsService = {
       ...item,
       subcategory_name: item.subcategories?.name,
       category_name: item.subcategories?.categories?.name,
+      product_name: item.waste_data_admin?.name,
     }));
   },
 
@@ -60,6 +66,10 @@ export const pointsService = {
             id,
             name
           )
+        ),
+        waste_data_admin:product_id (
+          id,
+          name
         )
       `)
       .eq('id', id)
@@ -71,6 +81,7 @@ export const pointsService = {
       ...data,
       subcategory_name: data.subcategories?.name,
       category_name: data.subcategories?.categories?.name,
+      product_name: data.waste_data_admin?.name,
     };
   },
 
@@ -206,6 +217,54 @@ export const pointsService = {
       id: item.id,
       name: item.name,
       category_name: item.categories?.name,
+    }));
+  },
+
+  /**
+   * Get products (waste_data_admin) under a subcategory (subcategories.id UUID).
+   * Path 1: subcategories.points_configuration_id -> waste_sub_categories -> waste_data_admin
+   * Path 2 (fallback): points_configurations.subcategory_id -> waste_sub_categories -> waste_data_admin
+   */
+  async getProductsBySubcategory(subcategoryId: string): Promise<ProductInSubcategory[]> {
+    let pcId: string | null = null;
+    const { data: subRow } = await supabase
+      .from('subcategories')
+      .select('points_configuration_id')
+      .eq('id', subcategoryId)
+      .single();
+    if (subRow?.points_configuration_id) pcId = subRow.points_configuration_id as string;
+
+    if (!pcId) {
+      const { data: pcRows } = await supabase
+        .from('points_configurations')
+        .select('id')
+        .eq('subcategory_id', subcategoryId)
+        .is('product_id', null)
+        .limit(1);
+      pcId = pcRows?.[0]?.id ?? null;
+    }
+    if (!pcId) return [];
+
+    const { data: wscRows, error: wscErr } = await supabase
+      .from('waste_sub_categories')
+      .select('id')
+      .eq('points_configuration_id', pcId);
+
+    if (wscErr || !wscRows?.length) return [];
+
+    const wscIds = wscRows.map((r: { id: number }) => r.id);
+    const { data: products, error: prodErr } = await supabase
+      .from('waste_data_admin')
+      .select('id, name, points_mode')
+      .in('subcategory_id', wscIds)
+      .order('name', { ascending: true });
+
+    if (prodErr || !products?.length) return [];
+
+    return products.map((p: { id: string; name: string; points_mode?: 'per_kg' | 'per_piece' | null }) => ({
+      id: p.id,
+      name: p.name,
+      points_mode: p.points_mode ?? 'per_kg',
     }));
   },
 };

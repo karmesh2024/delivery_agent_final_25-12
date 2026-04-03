@@ -6,7 +6,7 @@ import { Suspense } from 'react';
 export default function ProductsPage() {
   return (
     <Suspense fallback={<div>جاري التحميل...</div>}>
-      <ProductsListPage />
+      <ProductsListPage viewOnly />
     </Suspense>
   );
 } 

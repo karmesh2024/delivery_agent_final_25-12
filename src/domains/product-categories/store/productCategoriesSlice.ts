@@ -227,6 +227,30 @@ export const addSubCategory = createAsyncThunk(
   }
 );
 
+/** إنشاء فئة فرعية مع سعر بورصة أولي في خطوة واحدة */
+export const addSubCategoryWithInitialPrice = createAsyncThunk(
+  'productCategories/addSubCategoryWithInitialPrice',
+  async (
+    payload: { subCategory: Partial<SubCategory>; initialBuyPrice: number; initialSellPrice?: number | null },
+    { rejectWithValue }
+  ) => {
+    try {
+      const { data, error } = await categoryService.createSubCategoryWithInitialExchangePrice(
+        payload.subCategory,
+        payload.initialBuyPrice,
+        payload.initialSellPrice,
+        undefined
+      );
+      if (error) {
+        return rejectWithValue(error);
+      }
+      return data;
+    } catch (error) {
+      return rejectWithValue('فشل في إضافة الفئة الفرعية مع السعر');
+    }
+  }
+);
+
 export const updateSubCategory = createAsyncThunk(
   'productCategories/updateSubCategory',
   async ({ id, subCategory }: { id: string; subCategory: Partial<SubCategory> }, { rejectWithValue }) => {
@@ -253,6 +277,34 @@ export const deleteSubCategory = createAsyncThunk(
       return id;
     } catch (error) {
       return rejectWithValue('فشل في حذف الفئة الفرعية');
+    }
+  }
+);
+
+/** حذف فئة فرعية مع جميع المنتجات تحتها (تعطيل كتالوج + حذف من waste_data_admin + حذف الفئة) */
+export const deleteSubCategoryWithProducts = createAsyncThunk(
+  'productCategories/deleteSubCategoryWithProducts',
+  async (id: string, { rejectWithValue }) => {
+    try {
+      const { success, error } = await categoryService.deleteSubCategoryWithProducts(id);
+      if (!success) return rejectWithValue(error ?? 'فشل في حذف الفئة الفرعية مع المنتجات');
+      return id;
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'فشل في حذف الفئة الفرعية مع المنتجات');
+    }
+  }
+);
+
+/** حذف فئة رئيسية مع الفئات الفرعية وجميع المنتجات */
+export const deleteCategoryWithProducts = createAsyncThunk(
+  'productCategories/deleteCategoryWithProducts',
+  async (id: string, { rejectWithValue }) => {
+    try {
+      const { success, error } = await categoryService.deleteCategoryWithProducts(id);
+      if (!success) return rejectWithValue(error ?? 'فشل في حذف الفئة مع المنتجات');
+      return id;
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'فشل في حذف الفئة مع المنتجات');
     }
   }
 );
@@ -393,24 +445,40 @@ export const fetchCategoryBucketConfigsThunk = createAsyncThunk(
 
 export const addCategoryBucketConfigThunk = createAsyncThunk(
   'productCategories/addCategoryBucketConfig',
-  async (config: Omit<CategoryBucketConfig, 'id' | 'created_at' | 'updated_at'>, { rejectWithValue }) => {
+  async (
+    config: Parameters<typeof basketConfigService.addCategoryBucketConfig>[0],
+    { rejectWithValue }
+  ) => {
     try {
       const data = await basketConfigService.addCategoryBucketConfig(config);
       return data;
     } catch (error) {
-      return rejectWithValue('فشل في إضافة تكوين سلة الفئة الرئيسية');
+      const message =
+        error instanceof Error ? error.message : 'فشل في إضافة تكوين سلة الفئة الرئيسية';
+      return rejectWithValue(message);
     }
   }
 );
 
 export const updateCategoryBucketConfigThunk = createAsyncThunk(
   'productCategories/updateCategoryBucketConfig',
-  async ({ id, config }: { id: string; config: Partial<Omit<CategoryBucketConfig, 'id' | 'created_at' | 'updated_at'>> }, { rejectWithValue }) => {
+  async (
+    {
+      id,
+      config,
+    }: {
+      id: string;
+      config: Parameters<typeof basketConfigService.updateCategoryBucketConfig>[1];
+    },
+    { rejectWithValue }
+  ) => {
     try {
       const data = await basketConfigService.updateCategoryBucketConfig(id, config);
       return data;
     } catch (error) {
-      return rejectWithValue('فشل في تحديث تكوين سلة الفئة الرئيسية');
+      const message =
+        error instanceof Error ? error.message : 'فشل في تحديث تكوين سلة الفئة الرئيسية';
+      return rejectWithValue(message);
     }
   }
 );
@@ -512,6 +580,11 @@ const productCategoriesSlice = createSlice({
           state.subcategories.data.push(action.payload);
         }
       })
+      .addCase(addSubCategoryWithInitialPrice.fulfilled, (state, action) => {
+        if (action.payload) {
+          state.subcategories.data.push(action.payload);
+        }
+      })
       .addCase(updateSubCategory.fulfilled, (state, action) => {
         if (action.payload) {
           const index = state.subcategories.data.findIndex((subcat) => subcat.id === action.payload?.id);
@@ -535,6 +608,24 @@ const productCategoriesSlice = createSlice({
       .addCase(deleteSubCategory.rejected, (state, action) => {
         state.subcategories.loading = false;
         state.subcategories.error = action.payload as string;
+      })
+      .addCase(deleteSubCategoryWithProducts.pending, (state) => {
+        state.subcategories.loading = true;
+        state.subcategories.error = null;
+      })
+      .addCase(deleteSubCategoryWithProducts.fulfilled, (state, action) => {
+        state.subcategories.loading = false;
+        state.subcategories.data = state.subcategories.data.filter(sub => sub.id !== action.payload);
+      })
+      .addCase(deleteSubCategoryWithProducts.rejected, (state, action) => {
+        state.subcategories.loading = false;
+        state.subcategories.error = action.payload as string;
+      })
+      .addCase(deleteCategoryWithProducts.fulfilled, (state, action) => {
+        state.categories.data = state.categories.data.filter((cat) => cat.id !== action.payload);
+      })
+      .addCase(deleteCategoryWithProducts.rejected, (state, action) => {
+        state.categories.error = action.payload as string;
       })
 
       // العناصر

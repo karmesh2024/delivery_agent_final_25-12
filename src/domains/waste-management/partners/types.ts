@@ -58,4 +58,51 @@ export interface CreateOrderDTO
     items: PartnerOrderItem[];
 }
 
+// ══════════════════════════════════════════════
+// نظام العقود
+// ══════════════════════════════════════════════
 
+export type ContractType = "one_time" | "short_term" | "long_term";
+export type ContractStatus = "draft" | "active" | "completed" | "cancelled" | "expired";
+
+export interface PartnerContract {
+    id: string;
+    partner_id: string;
+    bid_id?: string;
+    subcategory_id?: number;
+    contract_type: ContractType;
+    agreed_price: number;               // سعر البيع للطن
+    operational_cost_override?: number;  // NULL = استخدم افتراضي الفئة
+    quantity: number;                    // الكمية الإجمالية بالطن
+    delivered_quantity: number;          // ما تم توريده فعلاً
+    unit: string;
+    start_date?: string;
+    end_date?: string;
+    status: ContractStatus;
+    approved_by?: string;
+    approved_at?: string;
+    affects_exchange_price: boolean;     // هل يؤثر العقد على سعر البورصة المرجح؟
+    notes?: string;
+    created_at?: string;
+    updated_at?: string;
+    // Join relations
+    partner?: IndustrialPartner;
+}
+
+export interface CreateContractDTO
+    extends Omit<PartnerContract, "id" | "delivered_quantity" | "created_at" | "updated_at" | "partner"> {}
+
+// ══════════════════════════════════════════════
+// التكاليف التشغيلية لكل فئة مادة
+// ══════════════════════════════════════════════
+
+export interface CategoryOperationalCost {
+    id: string;
+    subcategory_id: number;
+    transport_cost: number;   // تكلفة النقل/طن
+    sorting_cost: number;     // تكلفة الفرز/طن
+    storage_cost: number;     // تكلفة التخزين/طن
+    total_cost: number;       // المجموع (محسوب تلقائياً)
+    notes?: string;
+    updated_at?: string;
+}

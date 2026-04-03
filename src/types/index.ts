@@ -693,8 +693,11 @@ export const documentTypeLabels: Record<DocumentType, string> = {
 export interface Category {
   id: string;
   name: string;
+  code?: string;
   description: string | null;
   image_url: string | null;
+  visible_to_client_app?: boolean;
+  visible_to_agent_app?: boolean;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -702,17 +705,23 @@ export interface Category {
 export interface SubCategory {
   id: string;
   name: string;
+  code?: string;
   category_id: string | null;
   description: string | null;
   image_url: string | null;
   price: number | null;
   points_per_kg: number | null;
+  visible_to_client_app?: boolean;
+  visible_to_agent_app?: boolean;
   created_at: string | null;
   updated_at: string | null;
   categories?: {
     name: string;
   };
 }
+
+/** خيارات الظهور: تطبيق العميل | تطبيق الوكيل | كلا التطبيقين | تحت الانتظار */
+export type VisibilityOption = 'pending' | 'client_only' | 'agent_only' | 'both';
 
 export interface WasteItem {
   id: string;

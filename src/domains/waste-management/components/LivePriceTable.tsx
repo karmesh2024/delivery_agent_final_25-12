@@ -293,10 +293,11 @@ export const LivePriceTable: React.FC<LivePriceTableProps> = ({
             filteredPrices.map((item, index) => {
               const indicator = getPriceIndicator(item);
               const isFlashing = flashingPrices.has(item.id || 0);
-              
+              // Use index in key to guarantee uniqueness when id/product_id are duplicated
+              const rowKey = `row-${index}-${item.product_id ?? item.id ?? 'n'}`;
               return (
                 <TableRow
-                  key={item.id || index}
+                  key={rowKey}
                   className={cn(
                     "transition-all duration-300",
                     isFlashing && indicator.type === 'up' && "bg-green-50 animate-pulse",

@@ -2,34 +2,112 @@
  * Types and Interfaces for Points Management System
  */
 
+export type PointsPerKgAppliesTo = 'agents_only' | 'customers_only' | 'both';
+
 export interface PointsConfiguration {
   id: string;
   subcategory_id: string;
+  product_id?: string | null;
   points_per_kg: number;
+  points_per_kg_applies_to?: PointsPerKgAppliesTo;
   price_per_kg: number;
   point_value: number;
+  points_per_piece?: number;
+  point_value_per_piece?: number;
+  /** إستراتيجية تطبيق النقاط لهذا السطر */
+  points_strategy: 'WEIGHT_BASED' | 'PIECE_BASED' | 'HYBRID' | 'BONUS_ONLY' | 'NO_POINTS';
   is_active: boolean;
   min_weight?: number;
   max_weight?: number;
   bonus_multiplier?: number;
   description?: string;
+  /** بداية فترة صلاحية الإعداد (اختياري) */
+  effective_from?: string | null;
+  /** نهاية فترة صلاحية الإعداد (اختياري) */
+  effective_to?: string | null;
   created_at: string;
   updated_at: string;
   // Joined data
   subcategory_name?: string;
   category_name?: string;
+  product_name?: string;
 }
 
 export interface PointsConfigurationFormData {
   subcategory_id: string;
+  product_id?: string | null;
   points_per_kg: number;
+  points_per_kg_applies_to?: PointsPerKgAppliesTo;
   price_per_kg: number;
   point_value: number;
+  points_per_piece?: number;
+  point_value_per_piece?: number;
+  points_strategy?: 'WEIGHT_BASED' | 'PIECE_BASED' | 'HYBRID' | 'BONUS_ONLY' | 'NO_POINTS';
   is_active: boolean;
   min_weight?: number;
   max_weight?: number;
   bonus_multiplier?: number;
   description?: string;
+  effective_from?: string | null;
+  effective_to?: string | null;
+}
+
+/** منتج تحت فئة فرعية (للقائمة المنسدلة) */
+export interface ProductInSubcategory {
+  id: string;
+  name: string;
+  // طريقة حساب نقاط المستخدم لهذا المنتج: per_kg أو per_piece
+  points_mode?: 'per_kg' | 'per_piece' | null;
+}
+
+// ========== إعدادات النقاط للمتجر (منفصلة عن المخلفات) ==========
+
+export type PointsStrategy = 'WEIGHT_BASED' | 'PIECE_BASED' | 'HYBRID' | 'BONUS_ONLY' | 'NO_POINTS';
+
+/** إعداد نقاط للمتجر — يطبق على الفئات الرئيسية/الفرعية/المنتجات للمتجر فقط */
+export interface StorePointsConfiguration {
+  id: string;
+  store_subcategory_id: string;
+  store_product_id?: string | null;
+  points_strategy: PointsStrategy;
+  points_per_kg: number;
+  points_per_kg_applies_to?: PointsPerKgAppliesTo;
+  price_per_kg: number;
+  point_value: number;
+  points_per_piece?: number;
+  point_value_per_piece?: number;
+  is_active: boolean;
+  min_weight?: number;
+  max_weight?: number;
+  bonus_multiplier?: number;
+  description?: string | null;
+  effective_from?: string | null;
+  effective_to?: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined
+  store_subcategory_name?: string;
+  store_main_category_name?: string;
+  store_product_name?: string;
+}
+
+export interface StorePointsConfigurationFormData {
+  store_subcategory_id: string;
+  store_product_id?: string | null;
+  points_strategy?: PointsStrategy;
+  points_per_kg: number;
+  points_per_kg_applies_to?: PointsPerKgAppliesTo;
+  price_per_kg: number;
+  point_value: number;
+  points_per_piece?: number;
+  point_value_per_piece?: number;
+  is_active: boolean;
+  min_weight?: number;
+  max_weight?: number;
+  bonus_multiplier?: number;
+  description?: string | null;
+  effective_from?: string | null;
+  effective_to?: string | null;
 }
 
 export interface PointsTransaction {

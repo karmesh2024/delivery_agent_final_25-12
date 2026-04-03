@@ -10,29 +10,36 @@ import { pointsReportsService } from '../services/pointsReportsService';
 import {
   PointsConfiguration,
   PointsConfigurationFormData,
+  StorePointsConfiguration,
+  StorePointsConfigurationFormData,
   PointsTransaction,
   PointsReport,
   PointsSummary,
 } from '../types';
+import { storePointsConfigService } from '../services/storePointsConfigService';
 
 interface PointsState {
   configurations: PointsConfiguration[];
+  storeConfigurations: StorePointsConfiguration[];
   transactions: PointsTransaction[];
   transactionsCount: number;
   report: PointsReport | null;
   summary: PointsSummary | null;
   loading: boolean;
+  loadingStore: boolean;
   error: string | null;
   selectedConfiguration: PointsConfiguration | null;
 }
 
 const initialState: PointsState = {
   configurations: [],
+  storeConfigurations: [],
   transactions: [],
   transactionsCount: 0,
   report: null,
   summary: null,
   loading: false,
+  loadingStore: false,
   error: null,
   selectedConfiguration: null,
 };
@@ -63,6 +70,32 @@ export const deletePointsConfiguration = createAsyncThunk(
   'points/deleteConfiguration',
   async (id: string) => {
     await pointsService.deletePointsConfiguration(id);
+    return id;
+  }
+);
+
+// ========== إعدادات النقاط للمتجر (منفصلة عن المخلفات) ==========
+export const fetchStorePointsConfigurations = createAsyncThunk(
+  'points/fetchStoreConfigurations',
+  async () => storePointsConfigService.getStorePointsConfigurations()
+);
+
+export const createStorePointsConfiguration = createAsyncThunk(
+  'points/createStoreConfiguration',
+  async (config: StorePointsConfigurationFormData) =>
+    storePointsConfigService.createStorePointsConfiguration(config)
+);
+
+export const updateStorePointsConfiguration = createAsyncThunk(
+  'points/updateStoreConfiguration',
+  async ({ id, config }: { id: string; config: Partial<StorePointsConfigurationFormData> }) =>
+    storePointsConfigService.updateStorePointsConfiguration(id, config)
+);
+
+export const deleteStorePointsConfiguration = createAsyncThunk(
+  'points/deleteStoreConfiguration',
+  async (id: string) => {
+    await storePointsConfigService.deleteStorePointsConfiguration(id);
     return id;
   }
 );
@@ -220,6 +253,64 @@ const pointsSlice = createSlice({
       .addCase(fetchPointsSummary.rejected, (state, action) => {
         state.loading = false;
         state.error = action.error.message || 'فشل في جلب ملخص النقاط';
+      });
+
+    // ========== إعدادات النقاط للمتجر ==========
+    builder
+      .addCase(fetchStorePointsConfigurations.pending, (state) => {
+        state.loadingStore = true;
+        state.error = null;
+      })
+      .addCase(fetchStorePointsConfigurations.fulfilled, (state, action) => {
+        state.loadingStore = false;
+        state.storeConfigurations = action.payload;
+      })
+      .addCase(fetchStorePointsConfigurations.rejected, (state, action) => {
+        state.loadingStore = false;
+        state.error = action.error.message || 'فشل في جلب إعدادات نقاط المتجر';
+      });
+
+    builder
+      .addCase(createStorePointsConfiguration.pending, (state) => {
+        state.loadingStore = true;
+        state.error = null;
+      })
+      .addCase(createStorePointsConfiguration.fulfilled, (state, action) => {
+        state.loadingStore = false;
+        state.storeConfigurations.unshift(action.payload);
+      })
+      .addCase(createStorePointsConfiguration.rejected, (state, action) => {
+        state.loadingStore = false;
+        state.error = action.error.message || 'فشل في إنشاء إعدادات نقاط المتجر';
+      });
+
+    builder
+      .addCase(updateStorePointsConfiguration.pending, (state) => {
+        state.loadingStore = true;
+        state.error = null;
+      })
+      .addCase(updateStorePointsConfiguration.fulfilled, (state, action) => {
+        state.loadingStore = false;
+        const idx = state.storeConfigurations.findIndex((c) => c.id === action.payload.id);
+        if (idx !== -1) state.storeConfigurations[idx] = action.payload;
+      })
+      .addCase(updateStorePointsConfiguration.rejected, (state, action) => {
+        state.loadingStore = false;
+        state.error = action.error.message || 'فشل في تحديث إعدادات نقاط المتجر';
+      });
+
+    builder
+      .addCase(deleteStorePointsConfiguration.pending, (state) => {
+        state.loadingStore = true;
+        state.error = null;
+      })
+      .addCase(deleteStorePointsConfiguration.fulfilled, (state, action) => {
+        state.loadingStore = false;
+        state.storeConfigurations = state.storeConfigurations.filter((c) => c.id !== action.payload);
+      })
+      .addCase(deleteStorePointsConfiguration.rejected, (state, action) => {
+        state.loadingStore = false;
+        state.error = action.error.message || 'فشل في حذف إعدادات نقاط المتجر';
       });
   },
 });

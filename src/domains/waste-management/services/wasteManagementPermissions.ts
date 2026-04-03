@@ -45,7 +45,8 @@ export async function checkWasteManagementPermission(
 ): Promise<{ allowed: boolean; reason?: string }> {
   try {
     // جلب معلومات المسؤول
-    const { data: admin, error: adminError } = await supabase!
+    if (!supabase) throw new Error('Supabase client is not initialized');
+    const { data: admin, error: adminError } = await supabase
       .from('admins')
       .select('id, role_id, is_active')
       .eq('user_id', userId)
@@ -60,7 +61,8 @@ export async function checkWasteManagementPermission(
     }
 
     // التحقق من الصلاحية عبر الدور
-    const { data: rolePermission, error: roleError } = await supabase!
+    if (!supabase) throw new Error('Supabase client is not initialized');
+    const { data: rolePermission, error: roleError } = await supabase
       .from('role_permissions')
       .select('permission_id, permissions!inner(code)')
       .eq('role_id', admin.role_id)
@@ -72,7 +74,8 @@ export async function checkWasteManagementPermission(
     }
 
     // التحقق من الصلاحيات المخصصة للمسؤول (overrides)
-    const { data: override, error: overrideError } = await supabase!
+    if (!supabase) throw new Error('Supabase client is not initialized');
+    const { data: override, error: overrideError } = await supabase
       .from('admin_permissions_overrides')
       .select('is_granted, permissions!inner(code)')
       .eq('admin_id', admin.id)

@@ -8,6 +8,10 @@
     {
       "path": "/api/playlist-engine/scheduled-ads",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/zoon-scheduler",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

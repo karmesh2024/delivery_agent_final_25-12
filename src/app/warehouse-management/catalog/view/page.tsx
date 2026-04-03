@@ -32,7 +32,8 @@ export default function CatalogViewPage() {
     search: '',
     category: '',
     warehouse: '',
-    status: ''
+    status: '',
+    organizationLinked: 'all' as 'all' | 'yes' | 'no'
   });
   
   const [wasteFilters, setWasteFilters] = useState({
@@ -148,7 +149,12 @@ export default function CatalogViewPage() {
     const matchesStatus = !productFilters.status || productFilters.status === 'all' || 
       product.status === productFilters.status;
 
-    return matchesSearch && matchesCategory && matchesWarehouse && matchesStatus;
+    const hasOrgLink = !!(product as ProductCatalogItem & { unified_sub_category_id?: string | null }).unified_sub_category_id;
+    const matchesOrg = productFilters.organizationLinked === 'all' ||
+      (productFilters.organizationLinked === 'yes' && hasOrgLink) ||
+      (productFilters.organizationLinked === 'no' && !hasOrgLink);
+
+    return matchesSearch && matchesCategory && matchesWarehouse && matchesStatus && matchesOrg;
   });
 
   // فلترة المخلفات
@@ -345,6 +351,22 @@ export default function CatalogViewPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div>
+                    <Label htmlFor="product-org">الربط بالتنظيم</Label>
+                    <Select
+                      value={productFilters.organizationLinked}
+                      onValueChange={(value: 'all' | 'yes' | 'no') => setProductFilters(prev => ({ ...prev, organizationLinked: value }))}
+                    >
+                      <SelectTrigger id="product-org">
+                        <SelectValue placeholder="الكل" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">الكل</SelectItem>
+                        <SelectItem value="yes">مرتبط بالتنظيم فقط</SelectItem>
+                        <SelectItem value="no">غير مرتبط بالتنظيم</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -396,11 +418,16 @@ export default function CatalogViewPage() {
                             </div>
                           )}
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
                               <h3 className="font-semibold text-lg">{product.name}</h3>
                               <Badge variant={product.status === 'active' ? 'default' : 'secondary'}>
                                 {product.status === 'active' ? 'نشط' : product.status === 'inactive' ? 'متوقف' : 'قادم قريباً'}
                               </Badge>
+                              {(product as ProductCatalogItem & { unified_sub_category_id?: string | null }).unified_sub_category_id && (
+                                <Badge variant="outline" className="border-green-600 text-green-700 bg-green-50">
+                                  مرتبط بالتنظيم
+                                </Badge>
+                              )}
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
                               <div>

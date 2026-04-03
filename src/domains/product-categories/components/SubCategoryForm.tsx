@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   addSubCategory,
+  addSubCategoryWithInitialPrice,
   updateSubCategory,
   fetchSubCategoryById
 } from '@/domains/product-categories/store/productCategoriesSlice';
@@ -18,16 +19,6 @@ interface SubCategoryFormProps {
   onClose: () => void;
 }
 
-// واجهة محسنة للبيانات من Dialog
-interface SubCategoryDialogData {
-  name: string;
-  description: string;
-  image_url?: string;
-  price?: number;
-  points_per_kg?: number;
-  [key: string]: unknown;
-}
-
 export const SubCategoryForm: React.FC<SubCategoryFormProps> = ({
   categoryId,
   subcategoryId,
@@ -36,8 +27,8 @@ export const SubCategoryForm: React.FC<SubCategoryFormProps> = ({
 }) => {
   const dispatch = useAppDispatch();
   const { toast } = useToast();
-  const { selectedSubCategory } = useAppSelector(state => state.productCategories);
-  const { selectedCategory } = useAppSelector(state => state.productCategories);
+  const { data: categories } = useAppSelector(state => state.productCategories.categories);
+  const { selectedSubCategory, selectedCategory } = useAppSelector(state => state.productCategories);
 
   const [formData, setFormData] = useState<Partial<SubCategory>>({
     name: '',
@@ -74,15 +65,14 @@ export const SubCategoryForm: React.FC<SubCategoryFormProps> = ({
   const handleDialogSubmit = (data: FormData | DelegationData) => {
     // التحقق من نوع البيانات - فقط في حالة FormData نكمل
     if ('name' in data) {
-      const formData = data as FormData;
-      const dialogData = formData as unknown as SubCategoryDialogData;
+      const dialogFormData = data as FormData & { initial_exchange_buy_price?: number; initial_exchange_sell_price?: number };
       const convertedData: Partial<SubCategory> = {
-        name: formData.name || '',
-        description: formData.description || '',
-        image_url: dialogData.image_url || '',
-        category_id: categoryId,
-        price: dialogData.price || 0,
-        points_per_kg: dialogData.points_per_kg || 0,
+        name: dialogFormData.name || '',
+        description: dialogFormData.description || '',
+        image_url: dialogFormData.image_url || '',
+        category_id: dialogFormData.main_category_id || categoryId,
+        price: formData.price || 0,
+        points_per_kg: formData.points_per_kg || 0,
       };
 
       setIsSubmitting(true);
@@ -97,12 +87,24 @@ export const SubCategoryForm: React.FC<SubCategoryFormProps> = ({
               description: "تم تحديث الفئة الفرعية بنجاح",
             });
           } else {
-            // إضافة فئة فرعية جديدة
-            await dispatch(addSubCategory(convertedData)).unwrap();
-            toast({
-              title: "تم بنجاح",
-              description: "تمت إضافة الفئة الفرعية بنجاح",
-            });
+            const hasInitialPrice = typeof dialogFormData.initial_exchange_buy_price === 'number' && dialogFormData.initial_exchange_buy_price > 0;
+            if (hasInitialPrice) {
+              await dispatch(addSubCategoryWithInitialPrice({
+                subCategory: convertedData,
+                initialBuyPrice: dialogFormData.initial_exchange_buy_price,
+                initialSellPrice: dialogFormData.initial_exchange_sell_price ?? undefined,
+              })).unwrap();
+              toast({
+                title: "تم بنجاح",
+                description: "تمت إضافة الفئة الفرعية مع سعر البورصة الأولي بنجاح",
+              });
+            } else {
+              await dispatch(addSubCategory(convertedData)).unwrap();
+              toast({
+                title: "تم بنجاح",
+                description: "تمت إضافة الفئة الفرعية بنجاح",
+              });
+            }
           }
           onClose();
         } catch (error) {
@@ -133,7 +135,12 @@ export const SubCategoryForm: React.FC<SubCategoryFormProps> = ({
             : 'إضافة فئة فرعية جديدة' + (selectedCategory ? ` لـ: ${selectedCategory.name}` : '')
         }
         type="subCategory"
-        initialData={formData as unknown as FormData}
+        initialData={{
+          ...(formData as object),
+          main_category_id: (subcategoryId && selectedSubCategory?.category_id) || formData.category_id || categoryId,
+          image_url: formData.image_url || '',
+        } as FormData}
+        mainCategories={(categories || []).map((c) => ({ id: c.id, name: c.name }))}
         loading={isSubmitting}
       />
     </div>

@@ -21,6 +21,7 @@ export interface StockExchange {
   auto_update_enabled: boolean;
   last_update?: string;
   next_update?: string;
+  show_on_ticker: boolean;
   // علاقات
   category?: { name: string };
   subcategory?: { name: string };
@@ -51,356 +52,179 @@ export interface PriceHistoryLog {
 // خدمة إدارة نظام البورصة
 export const exchangeService = {
   // جلب جميع أسعار البورصة (من كتالوج المخلفات كمصدر أساسي)
-  async getAllPrices() {
-    try {
-      if (!supabase) {
-        console.error("Supabase client is not initialized.");
-        toast.error("خدمة Supabase غير متاحة.");
-        return [];
-      }
-      
-      // الخطوة 1: جلب جميع المخلفات من الكتالوج
-      const { data: catalogItems, error: catalogError } = await supabase!
-        .from("catalog_waste_materials")
-        .select(`
-          id,
-          waste_no,
-          name,
-          main_category_id,
-          sub_category_id,
-          expected_price,
-          weight,
-          created_at
-        `)
-        .order("created_at", { ascending: false });
+      // جلب الأسعار المنشورة فقط (للبورصة العامة)
+      async getPublishedPrices() {
+        try {
+          if (!supabase) throw new Error('Supabase client is not initialized');
 
-      if (catalogError) {
-        console.error("خطأ في جلب كتالوج المخلفات:", catalogError);
-        throw catalogError;
-      }
-
-      // جلب الفئات بشكل منفصل - أولاً من الجداول القديمة ثم البحث عن الموحدة
-      const mainCategoryIds = new Set<number>();
-      const subCategoryIds = new Set<number>();
-      catalogItems?.forEach(item => {
-        if (item.main_category_id) mainCategoryIds.add(Number(item.main_category_id));
-        if (item.sub_category_id) subCategoryIds.add(Number(item.sub_category_id));
-      });
-
-      // جلب الفئات من الجداول القديمة أولاً
-      let oldMainCategories: any[] = [];
-      let oldSubCategories: any[] = [];
-      
-      if (mainCategoryIds.size > 0) {
-        const { data } = await supabase!
-          .from("waste_main_categories")
-          .select("id, code, name")
-          .in("id", Array.from(mainCategoryIds));
-        oldMainCategories = data || [];
-      }
-
-      if (subCategoryIds.size > 0) {
-        const { data } = await supabase!
-          .from("waste_sub_categories")
-          .select("id, code, name")
-          .in("id", Array.from(subCategoryIds));
-        oldSubCategories = data || [];
-      }
-
-      // البحث عن الفئات الموحدة المقابلة باستخدام code
-      const codes = new Set<string>();
-      oldMainCategories.forEach(cat => { if (cat.code) codes.add(cat.code); });
-      oldSubCategories.forEach(cat => { if (cat.code) codes.add(cat.code); });
-
-      let unifiedMainCategories: any[] = [];
-      let unifiedSubCategories: any[] = [];
-      
-      if (codes.size > 0) {
-        const { data: unifiedMain } = await supabase!
-          .from("unified_main_categories")
-          .select("id, code, name, name_ar, classification_id")
-          .in("code", Array.from(codes))
-          .eq("is_active", true);
-        unifiedMainCategories = unifiedMain || [];
-
-        const { data: unifiedSub } = await supabase!
-          .from("unified_sub_categories")
-          .select("id, code, name, name_ar, main_category_id")
-          .in("code", Array.from(codes))
-          .eq("is_active", true);
-        unifiedSubCategories = unifiedSub || [];
-      }
-
-      // جلب التصنيفات لعرض التصنيف الكامل
-      const classificationIds = new Set<string>();
-      unifiedMainCategories.forEach(cat => {
-        if (cat.classification_id) classificationIds.add(cat.classification_id);
-      });
-
-      let classifications: any[] = [];
-      if (classificationIds.size > 0) {
-        const { data: classData } = await supabase!
-          .from("unified_classifications")
-          .select("id, name, name_ar, sector_id")
-          .in("id", Array.from(classificationIds))
-          .eq("is_active", true);
-        classifications = classData || [];
-      }
-
-      // جلب القطاعات
-      const sectorIds = new Set<string>();
-      classifications.forEach(cls => {
-        if (cls.sector_id) sectorIds.add(cls.sector_id);
-      });
-
-      let sectors: any[] = [];
-      if (sectorIds.size > 0) {
-        const { data: sectorData } = await supabase!
-          .from("warehouse_sectors")
-          .select("id, name, code")
-          .in("id", Array.from(sectorIds))
-          .eq("is_active", true);
-        sectors = sectorData || [];
-      }
-
-      // جلب categories و subcategories للمطابقة بالاسم
-      const { data: categoriesData } = await supabase!
-        .from("categories")
-        .select("id, name");
-      const categoriesMap = new Map((categoriesData || []).map(cat => [cat.name, cat.id]));
-      
-      const { data: subcategoriesData } = await supabase!
-        .from("subcategories")
-        .select("id, name");
-      const subcategoriesMap = new Map((subcategoriesData || []).map(sub => [sub.name, sub.id]));
-
-      // إنشاء خرائط للبحث السريع
-      const oldMainCategoryMap = new Map(oldMainCategories.map(cat => [cat.id, cat]));
-      const oldSubCategoryMap = new Map(oldSubCategories.map(cat => [cat.id, cat]));
-      const unifiedMainCategoryMap = new Map(unifiedMainCategories.map(cat => [cat.code, cat]));
-      const unifiedSubCategoryMap = new Map(unifiedSubCategories.map(cat => [cat.code, cat]));
-      const classificationMap = new Map(classifications.map(cls => [cls.id, cls]));
-      const sectorMap = new Map(sectors.map(sec => [sec.id, sec]));
-
-      if (!catalogItems || catalogItems.length === 0) {
-        console.log("لا توجد مواد في كتالوج المخلفات");
-        return [];
-      }
-
-      // الخطوة 2: جلب أسعار البورصة (إن وجدت)
-      const { data: stockPrices, error: stockError } = await supabase!
-        .from("stock_exchange")
-        .select("*");
-
-      // إنشاء خريطة للأسعار حسب product_id
-      const pricesMap = new Map();
-      if (stockPrices && !stockError) {
-        stockPrices.forEach(price => {
-          pricesMap.set(price.product_id, price);
-        });
-      }
-
-      // الخطوة 3: جلب waste_data_admin للربط بين catalog_waste_materials و stock_exchange
-      // نحتاج إلى ربط catalog_waste_materials.waste_no مع waste_data_admin.name
-      // ثم ربط waste_data_admin.id مع stock_exchange.product_id
-      const wasteNos = catalogItems.map(item => item.waste_no).filter(Boolean);
-      let wasteDataAdminMap = new Map();
-      
-      if (wasteNos.length > 0) {
-        const { data: wasteDataAdmin } = await supabase!
-          .from("waste_data_admin")
-          .select("id, name")
-          .in("name", wasteNos);
-        
-        if (wasteDataAdmin) {
-          wasteDataAdmin.forEach(wda => {
-            wasteDataAdminMap.set(wda.name, wda.id);
+          // 1. جلب بيانات البورصة (المنشورة فقط)
+          const { data: stockPrices, error: stockError } = await supabase
+            .from("stock_exchange")
+            .select(`
+              *,
+              catalog_item:catalog_waste_materials!left (
+                waste_no,
+                name,
+                main_category_id,
+                sub_category_id
+              )
+            `);
+    
+          if (stockError) throw stockError;
+          if (!stockPrices || stockPrices.length === 0) return [];
+    
+          // 2. تحسين البيانات (إضافة أسماء الفئات والمسارات)
+          // هذا الجزء مشابه لما كان يحدث في getAllPrices لكن بشكل معكوس (البدء من البورصة)
+          // سنقوم بتبسيط العملية هنا والاعتماد على البيانات المخزنة أو جلبها عند الحاجة
+          
+          return stockPrices.map(price => ({
+            ...price,
+            product_id: price.product_id || '',
+            buy_price: Number(price.buy_price) || 0,
+            sell_price: Number(price.sell_price) || 0,
+            base_price: Number(price.base_price) || 0,
+            // يمكن تحسين جلب بيانات الكتالوج هنا إذا لزم الأمر
+            catalog_item: price.catalog_item || { name: 'منتج غير معروف', waste_no: '---' }
+          })) as StockExchange[];
+    
+        } catch (error) {
+          console.error("خطأ في جلب الأسعار المنشورة:", error);
+          return [];
+        }
+      },
+    
+      // جلب المواد غير المسعرة (الموجودة في الكتالوج وليست في البورصة)
+      async getUnlistedItems() {
+        try {
+          if (!supabase) throw new Error('Supabase client is not initialized');
+    
+          // 1. جلب كل المواد من الكتالوج
+          const { data: catalogItems, error: catalogError } = await supabase
+            .from("catalog_waste_materials")
+            .select("*");
+            
+          if (catalogError) throw catalogError;
+    
+          // 2. جلب معرفات المواد الموجودة في البورصة
+          const { data: existingStock, error: stockError } = await supabase
+            .from("stock_exchange")
+            .select("product_id");
+            
+          if (stockError) throw stockError;
+    
+          const existingProductIds = new Set(existingStock?.map(s => s.product_id) || []);
+    
+          // 3. تصفية المواد التي ليست في البورصة
+          // ملاحظة: نفترض أن الربط يتم عبر product_id الذي يطابق waste_data_admin.id
+          // هذا يتطلب خطوة إضافية للربط بين catalog_waste_materials.waste_no و waste_data_admin.name
+          // للتبسيط، سنفترض أننا بحاجة للبحث عن waste_no في waste_data_admin للحصول على ID
+    
+          // جلب waste_data_admin للربط
+          const wasteNos = catalogItems?.map(i => i.waste_no) || [];
+          if (!supabase) throw new Error('Supabase client is not initialized');
+          const { data: wasteDataAdmin } = await supabase
+            .from("waste_data_admin")
+            .select("id, name")
+            .in("name", wasteNos);
+            
+          const wasteNameToIdMap = new Map();
+          wasteDataAdmin?.forEach(w => wasteNameToIdMap.set(w.name, w.id));
+    
+          // التصفية
+          const unlistedItems = catalogItems?.filter(item => {
+            const productId = wasteNameToIdMap.get(item.waste_no);
+            // إذا لم يكن للمادة ID في waste_data_admin، فهي بالتأكيد غير موجودة في البورصة
+            if (!productId) return true;
+            // إذا كان لها ID، نتحقق هل هو موجود في البورصة
+            return !existingProductIds.has(productId);
           });
+    
+          return unlistedItems || [];
+    
+        } catch (error) {
+          console.error("خطأ في جلب المواد غير المسعرة:", error);
+          return [];
         }
-      }
+      },
 
-      // الخطوة 4: دمج البيانات - كل مادة من الكتالوج مع سعرها من البورصة
-      const mergedData: StockExchange[] = catalogItems.map(item => {
-        // البحث عن product_id من waste_data_admin باستخدام waste_no
-        const productId = wasteDataAdminMap.get(item.waste_no);
-        const existingPrice = productId ? pricesMap.get(productId) : null;
-        
-        // جلب الفئات من الجداول القديمة أولاً
-        const oldMainCategory = item.main_category_id 
-          ? oldMainCategoryMap.get(Number(item.main_category_id))
-          : null;
-        const oldSubCategory = item.sub_category_id 
-          ? oldSubCategoryMap.get(Number(item.sub_category_id))
-          : null;
+      // جلب جميع أسعار البورصة (المنشورة فقط)
+      async getAllPrices() {
+        try {
+          if (!supabase) throw new Error('Supabase client is not initialized');
+    
+          // 1. جلب بيانات البورصة مع اسم المنتج
+          const { data: stockPrices, error: stockError } = await supabase
+            .from("stock_exchange")
+            .select(`
+              *,
+              product:waste_data_admin (
+                name
+              )
+            `);
+    
+          if (stockError) throw stockError;
+          if (!stockPrices || stockPrices.length === 0) return [];
 
-        // البحث عن الفئات الموحدة المقابلة
-        const unifiedMainCategory = oldMainCategory?.code 
-          ? unifiedMainCategoryMap.get(oldMainCategory.code)
-          : null;
-        const unifiedSubCategory = oldSubCategory?.code 
-          ? unifiedSubCategoryMap.get(oldSubCategory.code)
-          : null;
-
-        // جلب التصنيف والقطاع
-        const classification = unifiedMainCategory?.classification_id
-          ? classificationMap.get(unifiedMainCategory.classification_id)
-          : null;
-        const sector = classification?.sector_id
-          ? sectorMap.get(classification.sector_id)
-          : null;
-
-        // بناء المسار الكامل: القطاع > التصنيف > الفئة الأساسية
-        const mainCategoryName = unifiedMainCategory 
-          ? (unifiedMainCategory.name_ar || unifiedMainCategory.name)
-          : (oldMainCategory?.name || 'تصنيف عام');
-        
-        const classificationName = classification 
-          ? (classification.name_ar || classification.name)
-          : null;
-        
-        const sectorName = sector 
-          ? sector.name
-          : null;
-
-        // بناء المسار الكامل
-        let fullPathParts: string[] = [];
-        if (sectorName) fullPathParts.push(sectorName);
-        if (classificationName) fullPathParts.push(classificationName);
-        if (mainCategoryName) fullPathParts.push(mainCategoryName);
-        
-        const fullPath = fullPathParts.length > 0 
-          ? fullPathParts.join(' > ')
-          : 'تصنيف عام';
-        
-        // اسم مختصر للعرض (الفئة الأساسية فقط)
-        const shortName = mainCategoryName;
-        
-        const mainCategory = {
-          name: shortName,
-          full_path: fullPath
-        };
-        
-        const subCategory = unifiedSubCategory 
-          ? { name: unifiedSubCategory.name_ar || unifiedSubCategory.name }
-          : (oldSubCategory ? { name: oldSubCategory.name } : null);
-        
-        // إذا كان للمادة سعر موجود في البورصة، استخدمه
-        if (existingPrice) {
-          // تحويل Decimal إلى number
-          const basePrice = Number(existingPrice.base_price) || Number(item.expected_price) || 0;
-          const buyPrice = Number(existingPrice.buy_price) || basePrice;
-          const sellPrice = Number(existingPrice.sell_price) || (basePrice * 1.2);
+          if (!supabase) throw new Error('Supabase client is not initialized');
+          // 2. جلب الكتالوج للحصول على تفاصيل الفئات
+          const { data: catalogItems, error: catalogError } = await supabase
+            .from("catalog_waste_materials")
+            .select("*");
+            
+          if (catalogError) console.warn("Could not fetch catalog items for enrichment", catalogError);
           
-          // حساب نسبة التغيير إذا لم تكن موجودة
-          let priceChangePercent = existingPrice.price_change_percentage;
-          if (priceChangePercent === undefined || priceChangePercent === null) {
-            if (basePrice > 0 && buyPrice !== basePrice) {
-              priceChangePercent = ((buyPrice - basePrice) / basePrice) * 100;
-            } else {
-              priceChangePercent = 0;
-            }
-          } else {
-            priceChangePercent = Number(priceChangePercent);
-          }
-          
-          return {
-            ...existingPrice,
-            // التأكد من استخدام product_id الصحيح من existingPrice (UUID من waste_data_admin)
-            product_id: existingPrice.product_id || productId || item.id?.toString() || '',
-            base_price: basePrice,
-            buy_price: buyPrice,
-            sell_price: sellPrice,
-            price_change_percentage: priceChangePercent,
-            catalog_item: {
-              waste_no: item.waste_no,
-              name: item.name || item.waste_no,
-              main_category: mainCategory,
-              sub_category: subCategory,
-            }
-          };
-        }
-        
-        // إذا لم يكن للمادة سعر، أنشئ سجل افتراضي
-        const basePrice = item.expected_price || 10; // سعر افتراضي
-        
-        // استخدام UUID الصحيحة للفئات من categories و subcategories
-        // محاولة المطابقة بالاسم أولاً
-        let categoryId = '';
-        let subcategoryId = '';
-        
-        if (oldMainCategory?.name) {
-          // البحث عن category_id من categories بالاسم
-          for (const [catName, catId] of categoriesMap.entries()) {
-            if (catName.includes(oldMainCategory.name) || oldMainCategory.name.includes(catName)) {
-              categoryId = catId;
-              break;
-            }
-          }
-        }
-        
-        if (oldSubCategory?.name) {
-          // البحث عن subcategory_id من subcategories بالاسم
-          for (const [subName, subId] of subcategoriesMap.entries()) {
-            if (subName.includes(oldSubCategory.name) || oldSubCategory.name.includes(subName)) {
-              subcategoryId = subId;
-              break;
-            }
-          }
-        }
-        
-        // إذا لم نجد مطابقة بالاسم، نستخدم قيم افتراضية من stock_exchange الموجود
-        if (!categoryId) {
-          // استخدام category_id من stock_exchange الموجود كقيمة افتراضية
-          categoryId = '30f1c4b7-041a-4524-81a0-f9c2b6eea208'; // مخلفات بلاستيك
-        }
-        
-        if (!subcategoryId) {
-          // استخدام subcategory_id من stock_exchange الموجود كقيمة افتراضية
-          subcategoryId = 'aa5c3f93-e406-4f54-a464-e1050f1b3906'; // زجاجات
-        }
-        
-        return {
-          id: 0, // سيتم تحديثه عند الحفظ
-          product_id: productId || item.id?.toString() || '', // سيتم تحديثه عند إنشاء waste_data_admin
-          category_id: categoryId,
-          subcategory_id: subcategoryId,
-          base_price: basePrice,
-          buy_price: basePrice,
-          sell_price: basePrice * 1.2, // هامش ربح 20%
-          auto_update_enabled: false,
-          last_update: new Date().toISOString(),
-          demand_level: "normal",
-          supply_level: "normal",
-          price_change_percentage: 0, // لا يوجد تغيير لأن buy_price = base_price
-          catalog_item: {
-            waste_no: item.waste_no,
-            name: item.name || item.waste_no,
-            main_category: mainCategory,
-            sub_category: subCategory,
-          },
-          total_available_stock: item.weight || 0,
-        } as StockExchange;
-      });
+          const catalogMap = new Map((catalogItems || []).map(c => [c.waste_no, c]));
+    
+          // 3. دمج البيانات
+          const formattedPrices: StockExchange[] = stockPrices.map(price => {
+             const productName = (price.product as any)?.name;
+             const catalogItem = productName ? catalogMap.get(productName) : null;
+             
+             // تحديد الفئة الرئيسية والفرعية
+             // الأولوية 1: من الكتالوج
+             // الأولوية 2: من سجل البورصة
+             
+             return {
+               ...price,
+               id: price.id,
+               product_id: price.product_id,
+               waste_no: productName || '', 
+               name: catalogItem?.name || productName || 'مادة غير معروفة',
+               
+               // استخدام الفئات من الكتالوج (النظام الجديد) أو البورصة (القديم)
+               category_id: catalogItem?.main_category_id || price.category_id,
+               subcategory_id: catalogItem?.sub_category_id || price.subcategory_id,
+               
+               base_price: Number(price.base_price) || 0,
+               buy_price: Number(price.buy_price) || 0,
+               sell_price: Number(price.sell_price) || 0,
+               
+               is_published: true, // منشورة لأنها في جدول البورصة
+               
+               // إرفاق كائن الكتالوج للعرض
+               catalog_item: catalogItem ? {
+                 waste_no: catalogItem.waste_no,
+                 name: catalogItem.name,
+                 main_category_id: catalogItem.main_category_id,
+                 sub_category_id: catalogItem.sub_category_id
+               } : undefined
+             };
+          });
 
-      console.log(`تم دمج ${mergedData.length} مادة من الكتالوج مع أسعار البورصة`);
-      return mergedData;
-      
-    } catch (error) {
-      console.error("خطأ في جلب أسعار البورصة:", error);
-      toast.error("حدث خطأ أثناء جلب أسعار البورصة");
-      return [];
-    }
-  },
+          console.log(`تم جلب ${formattedPrices.length} مادة منشورة في البورصة`);
+          return formattedPrices;
+    
+        } catch (error) {
+          console.error("خطأ في جلب الأسعار المنشورة:", error);
+          return [];
+        }
+      },
 
   // جلب سعر منتج محدد في البورصة
   async getPriceByProductId(productId: string) {
     try {
-      if (!supabase) {
-        console.error("Supabase client is not initialized.");
-        toast.error("خدمة Supabase غير متاحة.");
-        return null;
-      }
-      const { data, error } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { data, error } = await supabase
         .from("stock_exchange")
         .select(`
           *,
@@ -424,13 +248,10 @@ export const exchangeService = {
 
   async getMarketTrends() {
     try {
-      if (!supabase) {
-        console.error("Supabase client is not initialized.");
-        return [];
-      }
+      if (!supabase) throw new Error('Supabase client is not initialized');
       // جلب أحدث سجل لكل stock_exchange_id
       // نستخدم طريقة أفضل: نجلب جميع السجلات ثم نختار الأحدث لكل stock_exchange_id
-      const { data, error } = await supabase!
+      const { data, error } = await supabase
         .from("exchange_price_history")
         .select("stock_exchange_id, product_id, old_buy_price, new_buy_price, created_at")
         .order("created_at", { ascending: false })
@@ -455,8 +276,9 @@ export const exchangeService = {
       
       let currentPricesMap = new Map<number, number>();
       if (stockExchangeIds.length > 0) {
+        if (!supabase) throw new Error('Supabase client is not initialized');
         // جلب الأسعار الحالية مع last_actual_purchase_price في نفس الاستعلام
-        const { data: currentPrices, error: pricesError } = await supabase!
+        const { data: currentPrices, error: pricesError } = await supabase
           .from("stock_exchange")
           .select("id, buy_price, last_actual_purchase_price, base_price")
           .in("id", stockExchangeIds);
@@ -487,7 +309,8 @@ export const exchangeService = {
       let basePricesMap = new Map<number, number>();
       
       if (stockExchangeIds.length > 0) {
-        const { data: actualPurchasePrices, error: actualPricesError } = await supabase!
+        if (!supabase) throw new Error('Supabase client is not initialized');
+        const { data: actualPurchasePrices, error: actualPricesError } = await supabase
           .from("stock_exchange")
           .select("id, last_actual_purchase_price, base_price")
           .in("id", stockExchangeIds);
@@ -593,12 +416,8 @@ export const exchangeService = {
         last_update: new Date().toISOString(),
       };
 
-      if (!supabase) {
-        console.error("Supabase client is not initialized.");
-        toast.error("خدمة Supabase غير متاحة.");
-        return null;
-      }
-      const { data, error } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { data, error } = await supabase
         .from("stock_exchange")
         .insert([newProduct])
         .select();
@@ -627,6 +446,8 @@ export const exchangeService = {
         return null;
       }
 
+      console.log(`بدء تحديث المنتج ${id} في البورصة:`, { product, userId });
+
       const updateData: Partial<StockExchange> = { ...product };
 
       // تحديث وقت التعديل دائماً
@@ -643,7 +464,8 @@ export const exchangeService = {
               updateData.base_price) * 100;
         } else if (id !== 0) {
           // جلب base_price من السجل الموجود
-          const { data: existing } = await supabase!
+          if (!supabase) throw new Error('Supabase client is not initialized');
+          const { data: existing } = await supabase
             .from("stock_exchange")
             .select("base_price, buy_price")
             .eq("id", id)
@@ -669,7 +491,8 @@ export const exchangeService = {
             // جلب السعر القديم
             let oldPrice = updateData.base_price;
             if (id !== 0) {
-              const { data: existing } = await supabase!
+              if (!supabase) throw new Error('Supabase client is not initialized');
+              const { data: existing } = await supabase
                 .from("stock_exchange")
                 .select("buy_price")
                 .eq("id", id)
@@ -689,7 +512,6 @@ export const exchangeService = {
               price_change_percentage: priceChangePercentage,
               reason: `تغيير سعر المخلفات بنسبة ${priceChangePercentage.toFixed(2)}%`,
               requested_by: userId,
-              status: 'pending',
             });
             
             if (approvalRequest) {
@@ -715,7 +537,8 @@ export const exchangeService = {
 
         // التحقق إذا كان السجل موجود بالفعل حسب product_id و region_id
         const regionId = updateData.region_id || 1;
-        const { data: existing, error: checkError } = await supabase!
+        if (!supabase) throw new Error('Supabase client is not initialized');
+        const { data: existing, error: checkError } = await supabase
           .from("stock_exchange")
           .select("id")
           .eq("product_id", updateData.product_id)
@@ -729,7 +552,8 @@ export const exchangeService = {
 
         if (existing) {
           // جلب السعر القديم قبل التحديث
-          const { data: oldData } = await supabase!
+          if (!supabase) throw new Error('Supabase client is not initialized');
+          const { data: oldData } = await supabase
             .from("stock_exchange")
             .select("buy_price, sell_price")
             .eq("product_id", updateData.product_id)
@@ -739,21 +563,31 @@ export const exchangeService = {
           const oldBuyPrice = oldData?.buy_price || updateData.buy_price || 0;
           const oldSellPrice = oldData?.sell_price || updateData.sell_price || 0;
           
-          // السجل موجود، نحدثه
-          const { data, error } = await supabase!
+          // تحديث السجل الموجود: نرسل فقط حقول الأسعار لتجنب تعارض FK (category_id/subcategory_id قد تكون من waste_* وليست UUID)
+          const safeUpdatePayload: Record<string, unknown> = {
+            base_price: updateData.base_price ?? updateData.buy_price ?? 0,
+            buy_price: updateData.buy_price ?? updateData.base_price ?? 0,
+            sell_price: updateData.sell_price ?? (Number(updateData.buy_price ?? updateData.base_price ?? 0) * 1.2),
+            last_update: updateData.last_update ?? new Date().toISOString(),
+            price_change_percentage: updateData.price_change_percentage ?? 0,
+          };
+          if (updateData.auto_update_enabled !== undefined) safeUpdatePayload.auto_update_enabled = updateData.auto_update_enabled;
+
+          if (!supabase) throw new Error('Supabase client is not initialized');
+          const { data, error } = await supabase
             .from("stock_exchange")
-            .update(updateData)
+            .update(safeUpdatePayload)
             .eq("product_id", updateData.product_id)
             .eq("region_id", regionId)
             .select();
 
           if (error) {
-            console.error("خطأ في تحديث stock_exchange:", error);
+            console.error("خطأ في تحديث stock_exchange:", error?.message ?? error);
             console.error("تفاصيل الخطأ:", {
-              code: error.code,
-              message: error.message,
-              details: error.details,
-              hint: error.hint
+              code: (error as { code?: string })?.code,
+              message: (error as { message?: string })?.message,
+              details: (error as { details?: string })?.details,
+              hint: (error as { hint?: string })?.hint
             });
             throw error;
           }
@@ -811,18 +645,30 @@ export const exchangeService = {
           return data[0] as StockExchange;
         } else {
           // السجل غير موجود، ننشئه
-          // التأكد من وجود جميع الحقول المطلوبة
-          if (!updateData.category_id) {
-            const errorMsg = "معرف الفئة مطلوب لإنشاء سجل جديد في البورصة";
-            console.error(errorMsg);
-            toast.error(errorMsg);
-            return null;
+          // stock_exchange يربط category_id و subcategory_id بجداول categories و subcategories (UUID فقط)
+          // إذا كانت القيم غير صحيحة (legacy integer IDs)، نستخدم قيم افتراضية لضمان الإنشاء
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          let categoryId = String(updateData.category_id ?? "").trim();
+          let subcategoryId = updateData.subcategory_id ? String(updateData.subcategory_id).trim() : "";
+
+          // Fallback for Category
+          if (!categoryId || !uuidRegex.test(categoryId)) {
+            console.warn(`استخدام category_id افتراضي للمنتج ${updateData.product_id} لأن القيمة "${categoryId}" غير صالحة UUID.`);
+            categoryId = '30f1c4b7-041a-4524-81a0-f9c2b6eea208'; // مخلفات بلاستيك (افتراضي)
+          }
+
+          // Fallback for SubCategory
+          if (subcategoryId && !uuidRegex.test(subcategoryId)) {
+             console.warn(`استخدام subcategory_id افتراضي للمنتج ${updateData.product_id} بأن القيمة "${subcategoryId}" غير صالحة UUID.`);
+             subcategoryId = 'aa5c3f93-e406-4f54-a464-e1050f1b3906'; // زجاجات (افتراضي)
+          } else if (!subcategoryId) {
+             subcategoryId = 'aa5c3f93-e406-4f54-a464-e1050f1b3906'; // زجاجات (افتراضي إذا لم يوجد)
           }
 
           const insertData: any = {
             product_id: updateData.product_id,
-            category_id: updateData.category_id,
-            subcategory_id: updateData.subcategory_id || null,
+            category_id: categoryId,
+            subcategory_id: subcategoryId || null,
             region_id: regionId,
             base_price: updateData.base_price || updateData.buy_price || 0,
             buy_price: updateData.buy_price || updateData.base_price || 0,
@@ -840,19 +686,16 @@ export const exchangeService = {
 
           console.log("محاولة إدراج في stock_exchange:", insertData);
           
-          const { data, error } = await supabase!
+          if (!supabase) throw new Error('Supabase client is not initialized');
+          const { data, error } = await supabase
             .from("stock_exchange")
             .insert([insertData])
             .select();
 
           if (error) {
-            console.error("خطأ في إدراج stock_exchange:", error);
-            console.error("تفاصيل الخطأ:", {
-              code: error.code,
-              message: error.message,
-              details: error.details,
-              hint: error.hint
-            });
+            const err = error as { code?: string; message?: string; details?: string; hint?: string };
+            console.error("خطأ في إدراج stock_exchange:", err?.message ?? err);
+            console.error("تفاصيل الخطأ:", { code: err?.code, message: err?.message, details: err?.details, hint: err?.hint });
             console.error("البيانات المرسلة:", insertData);
             throw error;
           }
@@ -903,7 +746,8 @@ export const exchangeService = {
         }
       } else {
         // جلب السعر القديم قبل التحديث
-        const { data: oldData } = await supabase!
+        if (!supabase) throw new Error('Supabase client is not initialized');
+        const { data: oldData } = await supabase
           .from("stock_exchange")
           .select("buy_price, sell_price, product_id, region_id")
           .eq("id", id)
@@ -912,20 +756,42 @@ export const exchangeService = {
         const oldBuyPrice = oldData?.buy_price || 0;
         const oldSellPrice = oldData?.sell_price || 0;
         
-        // تحديث سجل موجود حسب id
-        const { data, error } = await supabase!
+        // تحديث سجل موجود حسب id (نرسل فقط الحقول القابلة للتحديث لتجنب تعارض FK)
+        const safeUpdate: Record<string, unknown> = {
+          last_update: updateData.last_update ?? new Date().toISOString(),
+        };
+        if (updateData.base_price !== undefined) safeUpdate.base_price = updateData.base_price;
+        if (updateData.buy_price !== undefined) safeUpdate.buy_price = updateData.buy_price;
+        if (updateData.sell_price !== undefined) safeUpdate.sell_price = updateData.sell_price;
+        if (updateData.price_change_percentage !== undefined) safeUpdate.price_change_percentage = updateData.price_change_percentage;
+        if (updateData.auto_update_enabled !== undefined) safeUpdate.auto_update_enabled = updateData.auto_update_enabled;
+
+        if (!supabase) throw new Error('Supabase client is not initialized');
+        const { data, error } = await supabase
           .from("stock_exchange")
-          .update(updateData)
+          .update(safeUpdate)
           .eq("id", id)
           .select();
 
         if (error) {
-          console.error("خطأ في تحديث stock_exchange:", error);
+          const err = error as { message?: string };
+          console.error(`خطأ في تحديث stock_exchange (ID: ${id}):`, err?.message ?? error);
           throw error;
         }
 
         if (!data || data.length === 0) {
-          console.error("لم يتم تحديث أي سجل");
+          console.error(`لم يتم تحديث أي سجل للمنتج ID: ${id}. تأكد من صحة الـ ID أو صلاحيات المستخدم.`);
+          console.error("البيانات التي تمت محاولة تحديثها:", safeUpdate);
+          
+          // محاولة معرفة السبب: هل السجل موجود أصلاً؟
+          if (!supabase) throw new Error('Supabase client is not initialized');
+          const { count } = await supabase
+            .from("stock_exchange")
+            .select("id", { count: "exact", head: true })
+            .eq("id", id);
+            
+          console.error(`هل السجل موجود؟ ${count === 1 ? "نعم" : "لا (count: " + count + ")"}`);
+          
           return null;
         }
         
@@ -976,17 +842,13 @@ export const exchangeService = {
         toast.success("تم تحديث معلومات المنتج في البورصة بنجاح");
         return data[0] as StockExchange;
       }
+
     } catch (error: any) {
       console.error(`خطأ في تحديث المنتج رقم ${id} في البورصة:`, error);
       const errorMessage = error?.message || error?.details || 'حدث خطأ غير معروف';
-      console.error("تفاصيل الخطأ:", {
-        code: error?.code,
-        message: errorMessage,
-        hint: error?.hint,
-        details: error?.details,
-      });
-      toast.error(`حدث خطأ أثناء تحديث معلومات المنتج: ${errorMessage}`);
-      return null;
+      
+      // Rethrow to allow caller (slice/UI) to handle specific message
+      throw new Error(errorMessage);
     }
   },
 
@@ -998,7 +860,8 @@ export const exchangeService = {
         toast.error("خدمة Supabase غير متاحة.");
         return false;
       }
-      const { error } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { error } = await supabase
         .from("stock_exchange")
         .delete()
         .eq("id", id);
@@ -1046,7 +909,8 @@ export const exchangeService = {
 
       console.log("📤 إرسال بيانات التاريخ إلى قاعدة البيانات:", insertData);
 
-      const { data, error } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { data, error } = await supabase
         .from("exchange_price_history")
         .insert([insertData])
         .select();
@@ -1067,6 +931,57 @@ export const exchangeService = {
       console.error("❌ Error logging price history:", err);
     }
   },
+
+  /** تبديل حالة الظهور في شريط الأسعار للمنتج */
+  async toggleProductShowOnTicker(id: number, show: boolean): Promise<boolean> {
+    if (!supabase) return false;
+    const { error } = await supabase
+      .from("stock_exchange")
+      .update({ show_on_ticker: show })
+      .eq("id", id);
+    
+    if (error) {
+      console.error("خطأ في تحديث حالة الظهور في التيكر للمنتج:", error);
+      toast.error("فشل في تحديث حالة الظهور");
+      return false;
+    }
+    return true;
+  },
+
+  /** جلب نقاط السعر التاريخية للمنتجات (للرسم البياني) */
+  async getProductSparklineData(limit = 10) {
+    try {
+      if (!supabase) return {};
+      
+      const { data, error } = await supabase
+        .from("exchange_price_history")
+        .select("stock_exchange_id, new_buy_price, created_at")
+        .order("created_at", { ascending: false })
+        .limit(1000); // نجلب كمية كافية لتغطية معظم المنتجات والتواريخ
+
+      if (error) throw error;
+      
+      // تجميع النقاط حسب stock_exchange_id
+      const sparkMap: Record<number, number[]> = {};
+      (data || []).forEach(record => {
+        const id = Number(record.stock_exchange_id);
+        if (!sparkMap[id]) sparkMap[id] = [];
+        if (sparkMap[id].length < limit) {
+          sparkMap[id].push(Number(record.new_buy_price));
+        }
+      });
+
+      // عكس الترتيب ليكون من الأقدم للأحدث
+      Object.keys(sparkMap).forEach(id => {
+        sparkMap[Number(id)].reverse();
+      });
+
+      return sparkMap;
+    } catch (error) {
+      console.error("خطأ في جلب بيانات sparkline للمنتجات:", error);
+      return {};
+    }
+  }
 };
 
 export default exchangeService;

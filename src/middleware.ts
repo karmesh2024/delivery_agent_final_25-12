@@ -144,8 +144,12 @@ async function checkSecurity(
   path: string
 ): Promise<NextResponse | null> {
   try {
+    // استثناء مسارات الـ Webhooks والمسارات الداخلية من فحص الـ User-Agent 
+    const isWebhookPath = path.startsWith('/api/webhooks');
+    const isInternalPath = path.startsWith('/api/internal/');
+
     // فحص User-Agent مشبوه
-    if (isSuspiciousUserAgent(userAgent)) {
+    if (!isWebhookPath && !isInternalPath && isSuspiciousUserAgent(userAgent)) {
       await logSecurityEvent('Suspicious User Agent', {
         ip: clientIP,
         userAgent,
@@ -203,15 +207,21 @@ async function checkAuthentication(
   method: string
 ): Promise<NextResponse | null> {
   try {
-    // المسارات التي تتطلب مصادقة
-    const protectedPaths = ['/admin', '/warehouse', '/payment'];
-    const isProtected = protectedPaths.some(protectedPath => path.startsWith(protectedPath));
+    // طلبات الصفحات (تصفح عادي) لا نفحصها هنا — المصادقة تتم في الواجهة (RouteGuard / جلسة)
+    // فقط مسارات الـ API تتطلب Bearer token في الـ middleware
+    const isApiPath = path.startsWith('/api/');
+    if (!isApiPath) {
+      return null;
+    }
+
+    const protectedApiPaths = ['/api/admin', '/api/warehouse', '/api/payment'];
+    const isProtected = protectedApiPaths.some(protectedPath => path.startsWith(protectedPath));
 
     if (!isProtected) {
       return null;
     }
 
-    // فحص وجود token
+    // فحص وجود token لطلبات API المحمية فقط
     const token = request.headers.get('authorization')?.replace('Bearer ', '');
     if (!token) {
       await auditLogger.log(

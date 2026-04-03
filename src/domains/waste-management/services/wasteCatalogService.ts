@@ -109,7 +109,8 @@ class WasteCatalogService {
         source: sourceCode || null,
       };
 
-      const { data, error } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { data, error } = await supabase
         .from("catalog_waste_materials")
         .insert([wasteData])
         .select()
@@ -155,7 +156,8 @@ class WasteCatalogService {
         return null;
       }
 
-      const { data, error } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { data, error } = await supabase
         .from("catalog_waste_materials")
         .update(waste)
         .eq("id", id)
@@ -199,7 +201,8 @@ class WasteCatalogService {
         return false;
       }
 
-      const { error } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { error } = await supabase
         .from("catalog_waste_materials")
         .delete()
         .eq("id", id);
@@ -229,7 +232,8 @@ class WasteCatalogService {
   async getWasteMaterials(): Promise<WasteCatalogItem[]> {
     try {
       // الخطوة 1: جلب المخلفات من الكتالوج
-      const { data: catalogItems, error: catalogError } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { data: catalogItems, error: catalogError } = await supabase
         .from("catalog_waste_materials")
         .select(`
           *,
@@ -262,7 +266,8 @@ class WasteCatalogService {
       let oldSubCategories: any[] = [];
       
       if (mainCategoryIds.size > 0) {
-        const { data, error } = await supabase!
+        if (!supabase) throw new Error('Supabase client is not initialized');
+        const { data, error } = await supabase
           .from("waste_main_categories")
           .select("id, code, name")
           .in("id", Array.from(mainCategoryIds));
@@ -272,7 +277,8 @@ class WasteCatalogService {
       }
 
       if (subCategoryIds.size > 0) {
-        const { data, error } = await supabase!
+        if (!supabase) throw new Error('Supabase client is not initialized');
+        const { data, error } = await supabase
           .from("waste_sub_categories")
           .select("id, code, name")
           .in("id", Array.from(subCategoryIds));
@@ -296,7 +302,8 @@ class WasteCatalogService {
       let unifiedSubCategories: any[] = [];
       
       if (mainCategoryCodes.size > 0) {
-        const { data, error } = await supabase!
+        if (!supabase) throw new Error('Supabase client is not initialized');
+        const { data, error } = await supabase
           .from("unified_main_categories")
           .select("id, code, name, name_ar")
           .in("code", Array.from(mainCategoryCodes))
@@ -307,7 +314,8 @@ class WasteCatalogService {
       }
 
       if (subCategoryCodes.size > 0) {
-        const { data, error } = await supabase!
+        if (!supabase) throw new Error('Supabase client is not initialized');
+        const { data, error } = await supabase
           .from("unified_sub_categories")
           .select("id, code, name, name_ar")
           .in("code", Array.from(subCategoryCodes))

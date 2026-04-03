@@ -4,18 +4,29 @@ import React from 'react';
 import { DashboardLayout } from '@/shared/layouts/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
-import { FiTrendingUp, FiBriefcase, FiLayers, FiPackage, FiDollarSign, FiTruck } from "react-icons/fi";
+import { FiTrendingUp, FiBriefcase, FiPackage, FiDollarSign, FiTruck, FiPlusCircle, FiBell } from "react-icons/fi";
 import Link from "next/link";
+import { NotificationSender } from '@/components/notifications/NotificationSender';
 
 export default function WasteManagementHub() {
   return (
     <DashboardLayout title="إدارة المخلفات">
       <div className="p-6 space-y-6">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800">إدارة المخلفات</h1>
-          <p className="text-gray-500 mt-2">
-            المنظومة الشاملة لإدارة المخلفات من التصنيف والتسعير وحتى البيع للشركاء الصناعيين
-          </p>
+        <div className="flex justify-between items-start mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800">إدارة المخلفات</h1>
+            <p className="text-gray-500 mt-2">
+              المنظومة الشاملة لإدارة المخلفات من التصنيف والتسعير وحتى البيع للشركاء الصناعيين
+            </p>
+          </div>
+          <NotificationSender 
+            department="waste_mgmt" 
+            trigger={
+              <Button className="gap-2 bg-amber-600 hover:bg-amber-700">
+                <FiBell /> إرسال تنبيه أسعار/عام
+              </Button>
+            }
+          />
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -69,26 +80,26 @@ export default function WasteManagementHub() {
             </CardContent>
           </Card>
           
-          {/* بطاقة إدارة الفئات والمنتجات */}
+          {/* بطاقة طلبات إضافة المنتجات الجديدة */}
           <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center text-xl">
-                <div className="p-3 rounded-lg bg-green-50 mr-3">
-                  <FiLayers className="text-green-600 text-2xl" />
+                <div className="p-3 rounded-lg bg-amber-50 mr-3">
+                  <FiPlusCircle className="text-amber-600 text-2xl" />
                 </div>
-                إدارة الفئات والمنتجات
+                طلبات إضافة المنتجات الجديدة
               </CardTitle>
               <CardDescription className="mt-2">
-                تصنيف وإدارة أنواع المخلفات والفئات والمنتجات
+                تقديم ومراجعة طلبات إضافة منتجات جديدة مع الموافقة والمزامنة التلقائية
               </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="mb-4 text-gray-600 text-sm">
-                إدارة الفئات الرئيسية والفرعية للمخلفات وتصنيفاتها المختلفة.
+                تقديم طلب إضافة منتج جديد، مراجعته من مدير المخلفات، والموافقة لإضافته تلقائياً للكتالوج والمنتجات.
               </p>
-              <Link href="/waste-management/categories">
-                <Button className="w-full bg-green-600 hover:bg-green-700">
-                  إدارة الفئات والمنتجات
+              <Link href="/waste-management/product-requests">
+                <Button className="w-full bg-amber-600 hover:bg-amber-700">
+                  طلبات إضافة المنتجات الجديدة
                 </Button>
               </Link>
             </CardContent>

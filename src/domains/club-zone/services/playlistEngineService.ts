@@ -8,7 +8,8 @@
 
 import { supabase } from '@/lib/supabase';
 import { playlistTimelineService, CurrentPlaylistItem } from './playlistTimelineService';
-import { RadioContent, visualAdsService, VisualAd } from './radioContentService';
+import { RadioContent, VisualAd } from './radioContentService';
+import { visualAdsService } from './visualAdsService';
 
 export interface PlaylistEngineStatus {
   is_running: boolean;

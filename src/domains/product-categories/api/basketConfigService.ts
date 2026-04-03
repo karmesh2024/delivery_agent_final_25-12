@@ -10,9 +10,11 @@ export interface CategoryBucketConfig {
   id: string;
   created_at: string;
   updated_at: string;
-  category_id: string;
+  category_id: string | null;
+  waste_main_category_id: number | null;
   supplier_type: basket_supplier_type;
   basket_size: basket_size;
+  agent_id: string | null;
   basket_empty_weight_kg: number;
   max_net_weight_kg: number;
   max_volume_liters: number | null;
@@ -21,6 +23,35 @@ export interface CategoryBucketConfig {
   is_active: boolean;
   allocated_net_weight_kg: number;
   allocated_volume_liters: number | null;
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function isUuid(s: string): boolean {
+  return UUID_REGEX.test(s);
+}
+
+/** إعداد سلة لكل الفئات الرئيسية (تكوين عام) - للعميل أو لوكيل محدد */
+export interface GlobalBucketConfig {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  supplier_type: basket_supplier_type;
+  basket_size: basket_size;
+  agent_id: string | null;
+  basket_empty_weight_kg: number;
+  max_net_weight_kg: number;
+  max_volume_liters: number | null;
+  min_fill_percentage: number;
+  description: string | null;
+  is_active: boolean;
+  allocated_net_weight_kg: number;
+  allocated_volume_liters: number | null;
+}
+
+export interface AgentForBasket {
+  id: string;
+  full_name: string | null;
+  email: string | null;
 }
 
 export interface SubCategoryBucketConfig {
@@ -87,35 +118,65 @@ export async function getCategoryBucketConfigs(): Promise<CategoryBucketConfig[]
   return (data || []) as CategoryBucketConfig[];
 }
 
+/** نوع الإدخال: category_id قد يكون UUID (public.categories) أو رقماً كنص (waste_main_categories) */
+export type CategoryBucketConfigInsert = Omit<CategoryBucketConfig, 'id' | 'created_at' | 'updated_at'> & { category_id: string | null };
+
 export async function addCategoryBucketConfig(
-  config: Omit<CategoryBucketConfig, 'id' | 'created_at' | 'updated_at'>
+  config: CategoryBucketConfigInsert
 ): Promise<CategoryBucketConfig> {
   if (!supabase) throw new Error('Supabase client not initialized');
-  
+
+  const categoryIdRaw = config.category_id;
+  const useUuid = categoryIdRaw != null && isUuid(categoryIdRaw);
+  const payload = {
+    category_id: useUuid ? categoryIdRaw : null,
+    waste_main_category_id: !useUuid && categoryIdRaw != null && categoryIdRaw !== '' ? Number(categoryIdRaw) : null,
+    supplier_type: config.supplier_type,
+    basket_size: config.basket_size,
+    agent_id: config.agent_id ?? null,
+    basket_empty_weight_kg: config.basket_empty_weight_kg,
+    max_net_weight_kg: config.max_net_weight_kg,
+    max_volume_liters: config.max_volume_liters ?? null,
+    min_fill_percentage: config.min_fill_percentage,
+    description: config.description ?? null,
+    is_active: config.is_active ?? true,
+    allocated_net_weight_kg: config.allocated_net_weight_kg ?? 0,
+    allocated_volume_liters: config.allocated_volume_liters ?? null,
+  };
+
   const { data, error }: PostgrestSingleResponse<CategoryBucketConfig> = await supabase
     .from('category_bucket_config')
-    .insert(config)
+    .insert(payload)
     .select()
     .single();
-    
+
   if (error) throw error;
   if (!data) throw new Error('No data returned from insert operation');
   return data;
 }
 
 export async function updateCategoryBucketConfig(
-  id: string, 
-  config: Partial<Omit<CategoryBucketConfig, 'id' | 'created_at' | 'updated_at'>>
+  id: string,
+  config: Partial<Omit<CategoryBucketConfig, 'id' | 'created_at' | 'updated_at'> & { category_id?: string | null }>
 ): Promise<CategoryBucketConfig> {
   if (!supabase) throw new Error('Supabase client not initialized');
-  
+
+  const { category_id: categoryIdRaw, ...rest } = config;
+  let updatePayload: Record<string, unknown> = { ...rest };
+  if (categoryIdRaw !== undefined) {
+    const useUuid = categoryIdRaw != null && isUuid(categoryIdRaw);
+    updatePayload.category_id = useUuid ? categoryIdRaw : null;
+    updatePayload.waste_main_category_id =
+      !useUuid && categoryIdRaw != null && categoryIdRaw !== '' ? Number(categoryIdRaw) : null;
+  }
+
   const { data, error }: PostgrestSingleResponse<CategoryBucketConfig> = await supabase
     .from('category_bucket_config')
-    .update(config)
+    .update(updatePayload)
     .eq('id', id)
     .select()
     .single();
-    
+
   if (error) throw error;
   if (!data) throw new Error('No data returned from update operation');
   return data;
@@ -360,6 +421,62 @@ export async function deleteSubCategoryBucketConfig(id: string): Promise<void> {
     .eq('id', id);
     
   if (error) throw error;
+}
+
+// ========== إعداد سلة لكل الفئات الرئيسية (Global) ==========
+
+export async function getGlobalBucketConfigs(): Promise<GlobalBucketConfig[]> {
+  if (!supabase) throw new Error('Supabase client not initialized');
+  const { data, error } = await supabase.from('global_basket_config').select('*').order('supplier_type');
+  if (error) throw error;
+  return (data || []) as GlobalBucketConfig[];
+}
+
+export async function addGlobalBucketConfig(
+  config: Omit<GlobalBucketConfig, 'id' | 'created_at' | 'updated_at'>
+): Promise<GlobalBucketConfig> {
+  if (!supabase) throw new Error('Supabase client not initialized');
+  const { data, error }: PostgrestSingleResponse<GlobalBucketConfig> = await supabase
+    .from('global_basket_config')
+    .insert(config)
+    .select()
+    .single();
+  if (error) throw error;
+  if (!data) throw new Error('No data returned from insert');
+  return data;
+}
+
+export async function updateGlobalBucketConfig(
+  id: string,
+  config: Partial<Omit<GlobalBucketConfig, 'id' | 'created_at' | 'updated_at'>>
+): Promise<GlobalBucketConfig> {
+  if (!supabase) throw new Error('Supabase client not initialized');
+  const { data, error }: PostgrestSingleResponse<GlobalBucketConfig> = await supabase
+    .from('global_basket_config')
+    .update(config)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  if (!data) throw new Error('No data returned from update');
+  return data;
+}
+
+export async function deleteGlobalBucketConfig(id: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase client not initialized');
+  const { error } = await supabase.from('global_basket_config').delete().eq('id', id);
+  if (error) throw error;
+}
+
+/** قائمة الوكلاء لاختيار الوكيل عند إعداد سلة لكل الفئات (نوع المورد = وكيل) */
+export async function getAgentsForBasketConfig(): Promise<AgentForBasket[]> {
+  if (!supabase) throw new Error('Supabase client not initialized');
+  const { data, error } = await supabase
+    .from('agents')
+    .select('id, full_name, email')
+    .order('full_name');
+  if (error) throw error;
+  return (data || []) as AgentForBasket[];
 }
 
 // Get configurations with related category/subcategory information

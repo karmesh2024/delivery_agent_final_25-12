@@ -341,6 +341,31 @@ export const unifiedCategoriesService = {
   // =====================================================
 
   /**
+   * توليد كود فريد غير متكرر لفئة أساسية جديدة
+   */
+  async getNextMainCategoryCode(): Promise<string> {
+    try {
+      const { data, error } = await supabase
+        .from("unified_main_categories")
+        .select("code");
+
+      if (error) throw error;
+
+      const codes = (data || []).map((r: { code: string }) => r.code);
+      const prefix = "MAIN-";
+      const numericParts = codes
+        .filter((c) => c && c.startsWith(prefix))
+        .map((c) => parseInt(c.replace(prefix, ""), 10))
+        .filter((n) => !isNaN(n));
+      const nextNum = numericParts.length > 0 ? Math.max(...numericParts) + 1 : 1;
+      return `${prefix}${String(nextNum).padStart(3, "0")}`;
+    } catch (e: any) {
+      console.error("خطأ في توليد كود الفئة الأساسية:", e);
+      return `MAIN-${Date.now().toString(36).toUpperCase().slice(-4)}`;
+    }
+  },
+
+  /**
    * جلب الفئات الأساسية حسب التصنيف
    */
   async getMainCategoriesByClassification(

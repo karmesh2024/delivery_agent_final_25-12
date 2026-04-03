@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/sha
 import { Loader2, UserPlus, Download, Upload, AlertTriangle } from 'lucide-react';
 import { DashboardLayout } from '@/shared/layouts/DashboardLayout';
 import { toast } from '@/shared/ui/use-toast';
+import { NotificationSender } from '@/components/notifications/NotificationSender';
 
 export default function CustomersPage() {
   const router = useRouter();
@@ -77,8 +78,8 @@ export default function CustomersPage() {
             <h1 className="text-2xl font-bold mb-1">إدارة العملاء</h1>
             <p className="text-muted-foreground">عرض وإدارة بيانات العملاء</p>
           </div>
-          <div className="flex space-x-2">
-            <Button variant="outline" className="gap-2" onClick={handleAddCustomer}>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleAddCustomer}>
               <UserPlus className="h-4 w-4" />
               إضافة عميل جديد
             </Button>
@@ -90,6 +91,17 @@ export default function CustomersPage() {
               <Upload className="h-4 w-4" />
               استيراد
             </Button>
+            {/* زر الإشعارات الجديد - جرب وضعه هنا */}
+            <NotificationSender 
+              department="customer_mgmt" 
+              defaultTargetRole="customer"
+              trigger={
+                <Button size="sm" className="bg-primary text-white gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  إرسال إشعار
+                </Button>
+              }
+            />
             {totalCount === 0 && (
               <Button variant="destructive" className="gap-2" onClick={handleDiagnoseIssue}>
                 <AlertTriangle className="h-4 w-4" />

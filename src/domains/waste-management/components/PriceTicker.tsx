@@ -1,8 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StockExchange, exchangeService } from '../services/exchangeService';
+import { subcategoryExchangePriceService } from '../services/subcategoryExchangePriceService';
 import { TrendingUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/shared/components/ui/badge';
+import { PriceSparkline } from './PriceSparkline';
 import './PriceTicker.css';
 
 interface PriceTickerProps {
@@ -16,6 +19,9 @@ interface TickerItem {
   change: number;
   changePercent: number;
   type: 'up' | 'down' | 'neutral';
+  kind: 'subcategory' | 'product';
+  subName?: string;
+  sparkline?: number[];
 }
 
 export const PriceTicker: React.FC<PriceTickerProps> = ({ className }) => {
@@ -28,34 +34,57 @@ export const PriceTicker: React.FC<PriceTickerProps> = ({ className }) => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const prices = await exchangeService.getAllPrices();
-        const trends = await exchangeService.getMarketTrends();
+        const [prices, trends, subPrices, allSubs, allProducts, subCategoryTrends, subSparkMap, prodSparkMap] = await Promise.all([
+          exchangeService.getAllPrices(),
+          exchangeService.getMarketTrends(),
+          supabase ? supabase.from('subcategory_exchange_price').select('*, waste_sub_categories(name)').or('show_on_ticker.eq.true,show_on_ticker.is.null') : Promise.resolve({ data: [] }),
+          // جلب كل الفئات الفرعية لبناء خريطة ID → Name
+          supabase ? supabase.from('waste_sub_categories').select('id, name') : Promise.resolve({ data: [] }),
+          // جلب المنتجات مع subcategory_id لبناء خريطة product_id → subcategory_name
+          supabase ? supabase.from('waste_data_admin').select('id, name, subcategory_id') : Promise.resolve({ data: [] }),
+          // جلب تاريخ أسعار الفئات الفرعية (الحل الجديد)
+          subcategoryExchangePriceService.getSubcategoryMarketTrends(),
+          // جلب بيانات Sparkline
+          subcategoryExchangePriceService.getSubcategorySparklineData(10),
+          exchangeService.getProductSparklineData(10)
+        ]);
         
-        const items: TickerItem[] = prices
-          .filter(item => item.id && item.buy_price)
+        // بناء خريطة subcategory_id → name من جدول الفئات الفرعية
+        const subIdToName = new Map<string, string>();
+        (allSubs.data || []).forEach((sub: any) => {
+          subIdToName.set(String(sub.id), sub.name || '');
+        });
+        
+        // بناء خريطة product_id → subcategory_name من جدول المنتجات
+        const productToSubName = new Map<string, string>();
+        (allProducts.data || []).forEach((p: any) => {
+          if (p.subcategory_id) {
+            const subName = subIdToName.get(String(p.subcategory_id));
+            if (subName) {
+              productToSubName.set(String(p.id), subName);
+            }
+          }
+        });
+        
+        // 1. تحويل أسعار المنتجات (المحفوظة في البورصة والتي تم نشرها وتفعيل التيكر لها)
+        const productItems: TickerItem[] = prices
+          .filter(item => {
+            const isPublished = (item as any).is_published ?? (item.id !== 0 && !!item.id);
+            const showOnTicker = (item as any).show_on_ticker !== false;
+            return item.id && item.buy_price && isPublished && showOnTicker;
+          })
           .map(item => {
             const buyPrice = Number(item.buy_price) || 0;
             const itemId = Number(item.id) || 0;
             const itemProductId = item.product_id || '';
             
-            // البحث عن trend
             const trend = trends.find(t => {
               const trendId = Number(t.stock_exchange_id) || 0;
               const trendProductId = t.product_id || '';
-              
-              // مطابقة بـ stock_exchange_id أولاً (الأفضل)
-              const matchById = trendId === itemId && itemId > 0;
-              
-              // مطابقة بـ product_id إذا كان متاحاً
-              const matchByProductId = trendProductId && itemProductId && trendProductId === itemProductId;
-              
-              return matchById || matchByProductId;
+              return (trendId === itemId && itemId > 0) || (trendProductId && itemProductId && trendProductId === itemProductId);
             });
             
-            let change = 0;
-            let changePercent = 0;
-            let type: 'up' | 'down' | 'neutral' = 'neutral';
-            
+            let change = 0, changePercent = 0, type: 'up' | 'down' | 'neutral' = 'neutral';
             if (trend && trend.price_24h_ago) {
               const price24hAgo = Number(trend.price_24h_ago) || 0;
               if (price24hAgo > 0) {
@@ -63,54 +92,35 @@ export const PriceTicker: React.FC<PriceTickerProps> = ({ className }) => {
                 changePercent = (change / price24hAgo) * 100;
                 type = change > 0 ? 'up' : change < 0 ? 'down' : 'neutral';
               }
-            } else {
-              // Fallback إلى base_price
-              const basePrice = Number(item.base_price) || 0;
-              if (basePrice > 0) {
-                change = buyPrice - basePrice;
-                changePercent = (change / basePrice) * 100;
-                type = change > 0 ? 'up' : change < 0 ? 'down' : 'neutral';
-              }
             }
             
-            // بناء اسم المادة من الفئات (مثل الكتالوج)
-            let displayName = 'غير محدد';
-            if (item.catalog_item) {
-              const mainCat = (item.catalog_item.main_category as any)?.name || 
-                             (item.catalog_item.main_category as any)?.name_ar || '';
-              const subCat = (item.catalog_item.sub_category as any)?.name || 
-                            (item.catalog_item.sub_category as any)?.name_ar || '';
-              const fullPath = (item.catalog_item.main_category as any)?.full_path || '';
-              
-              // استخدام full_path إذا كان متاحاً (مثل: "القطاع المنزلي > المخلفات المنزلية > بلاستيك")
-              if (fullPath) {
-                displayName = fullPath;
-              } else if (mainCat && subCat) {
-                displayName = `${mainCat} > ${subCat}`;
-              } else if (mainCat) {
-                displayName = mainCat;
-              } else if (item.catalog_item.name && item.catalog_item.name !== item.catalog_item.waste_no) {
-                displayName = item.catalog_item.name;
-              } else if (item.catalog_item.waste_no) {
-                displayName = item.catalog_item.waste_no;
-              }
-            } else if (item.product?.name) {
-              displayName = item.product.name;
+            let displayName = item.product?.name || item.catalog_item?.name || 'منتج';
+            
+            // تحديد اسم الفئة الفرعية: الأولوية لخريطة product_id → subName
+            let subCategoryName = productToSubName.get(itemProductId) || '';
+            
+            // احتياطي: إذا لم نجد عبر product_id، نحاول عبر subcategory_id
+            if (!subCategoryName) {
+              const subCatId = String(item.subcategory_id || (item.catalog_item as any)?.sub_category_id || '');
+              subCategoryName = subIdToName.get(subCatId) || item.subcategory?.name || item.catalog_item?.sub_category?.name || '';
             }
             
-            return {
-              id: itemId,
-              name: displayName,
-              price: buyPrice,
-              change,
-              changePercent,
+            return { 
+              id: itemId, 
+              name: displayName, 
+              kind: 'product' as const,
+              subName: subCategoryName,
+              price: buyPrice, 
+              change, 
+              changePercent, 
               type,
+              sparkline: prodSparkMap[itemId] || [buyPrice, buyPrice]
             };
-          })
-          .filter(item => item.name !== 'غير محدد');
-        
-        // تكرار العناصر لإنشاء تأثير مستمر
-        setTickerItems([...items, ...items, ...items]);
+          });
+
+        // تم تعطيل إضافة الفئات الفرعية للشريط بناءً على طلب المستخدم لمزامنة الشريط مع فورم المنتجات المنشورة
+        setTickerItems([...productItems, ...productItems, ...productItems]);
+        setIsLive(true);
         setIsLive(true);
       } catch (error) {
         console.error('خطأ في جلب بيانات Ticker:', error);
@@ -177,7 +187,7 @@ export const PriceTicker: React.FC<PriceTickerProps> = ({ className }) => {
 
     return () => {
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+        supabase?.removeChannel(channelRef.current);
         channelRef.current = null;
       }
     };
@@ -207,15 +217,34 @@ export const PriceTicker: React.FC<PriceTickerProps> = ({ className }) => {
         >
           {tickerItems.map((item, index) => (
             <div
-              key={`${item.id}-${index}`}
-              className="flex items-center gap-3 whitespace-nowrap px-4 py-2 bg-white rounded-lg shadow-sm border border-gray-100 min-w-[280px]"
+              key={`ticker-${index}-${item.id ?? index}`}
+              className="flex items-center gap-3 whitespace-nowrap px-4 py-2 bg-white rounded-lg shadow-sm border border-gray-100 min-w-[340px]"
             >
+              {/* الرسم البياني المصغر للبورصة */}
+              <div className="flex-shrink-0 w-[60px] opacity-70 group-hover:opacity-100 transition-opacity">
+                <PriceSparkline data={item.sparkline || []} width={60} height={30} />
+              </div>
+
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-gray-600 truncate" title={item.name}>
-                  {item.name}
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  {item.kind === 'subcategory' ? (
+                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-emerald-50 text-emerald-700 border-emerald-200">فئة</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-blue-50 text-blue-700 border-blue-200">مادة</Badge>
+                  )}
+                  <span className="text-xs font-bold text-gray-800 truncate" title={item.name}>
+                    {item.name}
+                  </span>
                 </div>
-                <div className="text-sm font-bold text-gray-800">
-                  {item.price.toFixed(2)} ج.م
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-black text-gray-900">
+                    {item.price.toFixed(2)} <span className="text-[10px] font-normal text-gray-500">ج.م</span>
+                  </div>
+                  {item.kind === 'product' && item.subName && (
+                    <div className="text-[10px] text-indigo-500 font-medium truncate opacity-80">
+                      ({item.subName})
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">

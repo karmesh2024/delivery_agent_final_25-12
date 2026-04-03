@@ -13,6 +13,27 @@
 
 ---
 
+## ⚠️ مهم: أي رابط تضعه في الـ Cron؟
+
+**في لوحة البث العام ترى 3 أنواع من الروابط — لا يصلح أيٌّ منها للـ Cron:**
+
+| ما تراه في اللوحة | مثال | استخدامه في الـ Cron؟ |
+|-------------------|------|------------------------|
+| **Playlist M3U** | `https://....supabase.co/.../playlist.m3u` | ❌ **لا** — هذا مكان تخزين الملف بعد التوليد |
+| **Scheduled Ads M3U** | `https://....supabase.co/.../scheduled_ads.m3u` | ❌ **لا** — نفس الفكرة |
+| **Stream URL** | `http://radio.karmesh.eg:8000/stream` | ❌ **لا** — هذا للاستماع فقط |
+
+**في الـ Cron تضيف روابط الـ API في تطبيقك على Vercel** — هي التي تُولد الملفات وترفعها إلى Supabase:
+
+| Cron | الرابط الذي تضعه في حقل URL |
+|------|-----------------------------|
+| **Cron 1** | `https://delivery-agent-final-25-12.vercel.app/api/playlist-engine/generate-m3u` |
+| **Cron 2** | `https://delivery-agent-final-25-12.vercel.app/api/playlist-engine/scheduled-ads` |
+
+> دوماً استخدم دومين تطبيقك من شريط العنوان (مثل `delivery-agent-final-25-12.vercel.app`) + المسار `/api/playlist-engine/...`.
+
+---
+
 ## الخطوة 2: معرفة رابط التطبيق (مهم جداً)
 
 قبل إنشاء أي Cron Job، نحتاج الرابط الكامل للتطبيق:
@@ -31,13 +52,16 @@
 
 | ✅ في حقل URL بالـ Cron تكتب | ❌ لا تكتب الدومين فقط |
 |-----------------------------|-------------------------|
-| `https://delivery-agent-final-25-12-w9ew.vercel.app/api/playlist-engine/generate-m3u` | `https://delivery-agent-final-25-12-w9ew.vercel.app` |
+| `https://دومينك.vercel.app/api/playlist-engine/generate-m3u` | `https://دومينك.vercel.app` |
 
-- **الدومين من Domains:** `delivery-agent-final-25-12-w9ew.vercel.app`
-- **رابط Cron 1 للنسخ:**  
-  `https://delivery-agent-final-25-12-w9ew.vercel.app/api/playlist-engine/generate-m3u`
-- **رابط Cron 2 للنسخ:**  
-  `https://delivery-agent-final-25-12-w9ew.vercel.app/api/playlist-engine/scheduled-ads`
+**انسخ الدومين من شريط العنوان عند فتح صفحة البث العام** (مثلاً `delivery-agent-final-25-12.vercel.app` أو `delivery-agent-final-25-12-w9ew.vercel.app`)، ثم أضف المسار.
+
+**أمثلة جاهزة للنسخ (غيّر الدومين إذا اختلف عندك):**
+
+- **رابط Cron 1:**  
+  `https://delivery-agent-final-25-12.vercel.app/api/playlist-engine/generate-m3u`
+- **رابط Cron 2:**  
+  `https://delivery-agent-final-25-12.vercel.app/api/playlist-engine/scheduled-ads`
 
 ---
 
@@ -53,16 +77,23 @@
 
 ---
 
-### 3.2 تعبئة الحقول — Cron Job الأول
+### 3.2 تعبئة الحقول — Cron Job الأول (تبويب COMMON)
 
-| الحقل | القيمة المطلوبة |
-|-------|-----------------|
-| **Title** أو **Name** | `Update Radio Playlist M3U` |
-| **URL** أو **Address** | `https://delivery-agent-final-25-12-w9ew.vercel.app/api/playlist-engine/generate-m3u` |
-| **Request Method** | `POST` |
-| **Schedule** | `* * * * *` أو **Every minute** |
+| الحقل | القيمة المطلوبة | ❌ خطأ شائع |
+|-------|-----------------|-------------|
+| **Title** | `Update Radio Playlist M3U` | لا تتركه فارغاً |
+| **URL** | `https://delivery-agent-final-25-12.vercel.app/api/playlist-engine/generate-m3u` | ❌ `https://delivery-agent-final-25-12.vercel.app` فقط |
+| **Schedule** | **Every minute** أو `* * * * *` | ❌ Every 15 minutes |
 
-> ⚠️ **مهم:** استخدم الرابط **الكامل** (الدومين + المسار) كما في الجدول، وليس الدومين فقط كما في Domains.
+> ⚠️ **مهم:** في URL أضف `/api/playlist-engine/generate-m3u` في نهاية الدومين. **الدومين وحده لا يكفي.**
+
+### 3.2.1 تبويب ADVANCED (Method و Headers)
+
+1. اضغط تبويب **ADVANCED** بجانب COMMON.
+2. **Request method:** اختر **POST** (وليس GET).
+3. **Request Headers** — أضف:
+   - `Authorization` = `Bearer karmesh_radio_cron_secret_2024`
+   - `Content-Type` = `application/json`
 
 ---
 
@@ -109,7 +140,7 @@
 | الحقل | القيمة المطلوبة |
 |-------|-----------------|
 | **Title** | `Update Scheduled Ads M3U` |
-| **URL** | `https://delivery-agent-final-25-12-w9ew.vercel.app/api/playlist-engine/scheduled-ads` |
+| **URL** | `https://delivery-agent-final-25-12.vercel.app/api/playlist-engine/scheduled-ads` |
 | **Request Method** | `POST` |
 | **Schedule** | `* * * * *` أو **Every minute** |
 
@@ -170,11 +201,11 @@
 ## ملخص القيم المهمة (للنسخ)
 
 ```
-الدومين فقط (من Domains):  delivery-agent-final-25-12-w9ew.vercel.app
-                            ↑ هذا لا يكفي للـ Cron
+الدومين (من شريط العنوان):  delivery-agent-final-25-12.vercel.app
+                             ↑ هذا الجزء فقط، لا تضعه في Cron بدون المسار
 
-CRON 1 - URL (كامل):      https://delivery-agent-final-25-12-w9ew.vercel.app/api/playlist-engine/generate-m3u
-CRON 2 - URL (كامل):      https://delivery-agent-final-25-12-w9ew.vercel.app/api/playlist-engine/scheduled-ads
+CRON 1 - URL (كامل):      https://delivery-agent-final-25-12.vercel.app/api/playlist-engine/generate-m3u
+CRON 2 - URL (كامل):      https://delivery-agent-final-25-12.vercel.app/api/playlist-engine/scheduled-ads
 
 Method:                   POST
 Header 1:                 Authorization: Bearer karmesh_radio_cron_secret_2024

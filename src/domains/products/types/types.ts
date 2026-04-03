@@ -83,6 +83,7 @@ export interface Product {
   default_profit_margin?: Prisma.Decimal | null;
   auto_calculate_prices?: boolean;
   catalog_product_id?: string | null; // ربط المنتج بكتالوج المخازن
+  image_url?: string | null;
   store_product_images?: {
     image_url: string;
     alt_text_ar?: string | null;

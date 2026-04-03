@@ -405,7 +405,7 @@ export const cleanForLog = (data: unknown): unknown => {
 };
 
 // 🎛️ دوال مساعدة للتكامل مع Redux
-export const getCurrentUserId = async (): Promise<string | null> => {
+export const getCurrentUserId = (): string | null => {
   if (typeof window === "undefined") {
     return null;
   }
@@ -416,25 +416,12 @@ export const getCurrentUserId = async (): Promise<string | null> => {
     if (state) {
       const parsed = JSON.parse(state);
       const auth = JSON.parse(parsed.auth || "{}");
-      if (auth.user?.id || auth.userId) {
-        return auth.user?.id || auth.userId;
+      if (auth.user?.id || auth.currentAdmin?.id) {
+        return auth.user?.id || auth.currentAdmin?.id;
       }
     }
   } catch {
     // تجاهل أخطاء التحليل
-  }
-
-  // محاولة الحصول من Supabase مباشرة
-  try {
-    const { supabase } = await import('./supabase');
-    if (supabase) {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (!error && user) {
-        return user.id;
-      }
-    }
-  } catch (error) {
-    console.warn('Error getting user from Supabase:', error);
   }
 
   return null;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchCategories, deleteCategory } from '@/domains/product-categories/store/productCategoriesSlice';
+import { fetchCategories, deleteCategory, deleteCategoryWithProducts } from '@/domains/product-categories/store/productCategoriesSlice';
 import { useToast } from '@/shared/ui/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
@@ -15,16 +15,19 @@ import {
 } from '@/shared/ui/table';
 import { useRouter } from 'next/navigation';
 import { CategoryForm } from '../components/CategoryForm';
+import { VisibilitySelect } from '../components/VisibilitySelect';
+import { categoryService } from '../api/categoryService';
 import { unwrapResult } from '@reduxjs/toolkit';
-import { 
-  UniversalDialog
-} from '@/shared/ui/universal-dialog';
-
-// استيراد أزرار الحوار من الملف الصحيح
-import { 
-  PermissionsDialogConfirmButton as DialogConfirmButton, 
-  PermissionsDialogCloseButton as DialogCloseButton
-} from '@/app/permissions/components/PermissionsUserDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/shared/ui/alert-dialog';
 
 export const CategoriesListPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -41,6 +44,7 @@ export const CategoriesListPage: React.FC = () => {
   // Local state for delete confirmation dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+  const [productCountForDelete, setProductCountForDelete] = useState<number>(0);
   
   // Estado para forzar la recarga
   const [refreshKey, setRefreshKey] = useState(0);
@@ -58,105 +62,63 @@ export const CategoriesListPage: React.FC = () => {
     setEditingCategory(categoryId);
   };
 
-  const handleDeleteConfirmation = (categoryId: string) => {
-    console.log('بدء عملية التأكيد على حذف الفئة:', categoryId);
+  const handleDeleteConfirmation = async (categoryId: string) => {
     setCategoryToDelete(categoryId);
     setDeleteDialogOpen(true);
+    const count = await categoryService.getProductCountByCategoryId(categoryId);
+    setProductCountForDelete(count);
   };
 
   const handleCancelDelete = () => {
-    console.log('تم إلغاء عملية الحذف');
     setDeleteDialogOpen(false);
     setCategoryToDelete(null);
+    setProductCountForDelete(0);
   };
 
-  const confirmDelete = async () => {
-    console.log('تأكيد حذف الفئة:', categoryToDelete);
-    if (categoryToDelete) {
-      try {
-        console.log('Iniciando proceso de eliminación para categoría ID:', categoryToDelete);
-        const resultAction = await dispatch(deleteCategory(categoryToDelete));
-        const result = unwrapResult(resultAction);
-        
-        console.log('Resultado de la acción de eliminación:', result);
-        
-        if (result === categoryToDelete) {
-          // حذف ناجح
-          toast({
-            title: "تم بنجاح",
-            description: "تم حذف الفئة بنجاح",
-          });
-          // Forzar recarga después de eliminar
-          setRefreshKey(prev => prev + 1);
-        } else {
-          // حدث خطأ غير متوقع
-          toast({
-            title: "خطأ",
-            description: "حدث خطأ غير متوقع أثناء حذف الفئة",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error('Error al eliminar categoría:', error);
-        
-        // استخراج رسالة الخطأ
-        let errorMessage = "فشل حذف الفئة";
-        if (error && typeof error === 'object' && 'message' in error) {
-          errorMessage = error.message as string;
-        }
-        
-        toast({
-          title: "خطأ",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      } finally {
-        setDeleteDialogOpen(false);
-        setCategoryToDelete(null);
-      }
-    }
-  };
-
-  const handleDirectDelete = async (categoryId: string) => {
-    console.log('بدء عملية الحذف المباشر للفئة:', categoryId);
+  const confirmDeleteOnly = async () => {
+    if (!categoryToDelete) return;
     try {
-      // استدعاء عملية الحذف مباشرة بدون نافذة تأكيد
-      const resultAction = await dispatch(deleteCategory(categoryId));
+      const resultAction = await dispatch(deleteCategory(categoryToDelete));
       const result = unwrapResult(resultAction);
-      
-      console.log('نتيجة عملية الحذف المباشر:', result);
-      
-      if (result === categoryId) {
-        // حذف ناجح
-        toast({
-          title: "تم بنجاح",
-          description: "تم حذف الفئة بنجاح",
-        });
-        // إعادة تحميل القائمة
+      if (result === categoryToDelete) {
+        toast({ title: "تم بنجاح", description: "تم حذف الفئة. الفئات الفرعية والمنتجات تبقى بدون فئة رئيسية (حسب إعداد قاعدة البيانات)." });
         setRefreshKey(prev => prev + 1);
       } else {
-        // خطأ غير متوقع
-        toast({
-          title: "خطأ",
-          description: "حدث خطأ غير متوقع أثناء الحذف المباشر",
-          variant: "destructive",
-        });
+        toast({ title: "خطأ", description: "حدث خطأ أثناء حذف الفئة", variant: "destructive" });
       }
     } catch (error) {
-      console.error('خطأ في عملية الحذف المباشر:', error);
-      
-      // استخراج رسالة الخطأ
-      let errorMessage = "فشل الحذف المباشر";
-      if (error && typeof error === 'object' && 'message' in error) {
-        errorMessage = error.message as string;
-      }
-      
-      toast({
-        title: "خطأ",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      const errorMessage = error && typeof error === 'object' && 'message' in error ? (error as Error).message : "فشل حذف الفئة";
+      toast({ title: "خطأ", description: errorMessage, variant: "destructive" });
+    } finally {
+      setDeleteDialogOpen(false);
+      setCategoryToDelete(null);
+      setProductCountForDelete(0);
     }
+  };
+
+  const confirmDeleteWithProducts = async () => {
+    if (!categoryToDelete) return;
+    try {
+      const resultAction = await dispatch(deleteCategoryWithProducts(categoryToDelete));
+      const result = unwrapResult(resultAction);
+      if (result === categoryToDelete) {
+        toast({ title: "تم بنجاح", description: "تم حذف الفئة وجميع الفئات الفرعية والمنتجات تحتها." });
+        setRefreshKey(prev => prev + 1);
+      } else {
+        toast({ title: "خطأ", description: "حدث خطأ أثناء حذف الفئة مع المنتجات", variant: "destructive" });
+      }
+    } catch (error) {
+      const errorMessage = error && typeof error === 'object' && 'message' in error ? (error as Error).message : "فشل حذف الفئة مع المنتجات";
+      toast({ title: "خطأ", description: errorMessage, variant: "destructive" });
+    } finally {
+      setDeleteDialogOpen(false);
+      setCategoryToDelete(null);
+      setProductCountForDelete(0);
+    }
+  };
+
+  const handleDirectDelete = (categoryId: string) => {
+    handleDeleteConfirmation(categoryId);
   };
 
   const closeAddDialog = () => {
@@ -173,6 +135,21 @@ export const CategoriesListPage: React.FC = () => {
 
   const handleShowSubcategories = (categoryId: string) => {
     router.push(`/product-categories/subcategories/${categoryId}`);
+  };
+
+  const handleVisibilityChange = async (
+    categoryId: string,
+    visibility: { visible_to_client_app: boolean; visible_to_agent_app: boolean }
+  ) => {
+    try {
+      const { error } = await categoryService.updateCategoryVisibility(categoryId, visibility);
+      if (error) throw new Error(error);
+      toast({ title: 'تم بنجاح', description: 'تم تحديث إعدادات الظهور' });
+      setRefreshKey((prev) => prev + 1);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'فشل تحديث الظهور';
+      toast({ title: 'خطأ', description: msg, variant: 'destructive' });
+    }
   };
 
   if (loading && categories.length === 0) {
@@ -212,6 +189,7 @@ export const CategoriesListPage: React.FC = () => {
                   <TableHead className="text-right">الاسم</TableHead>
                   <TableHead className="text-right">الوصف</TableHead>
                   <TableHead className="text-right">الصورة</TableHead>
+                  <TableHead className="text-right">الظهور</TableHead>
                   <TableHead className="text-right">الإجراءات</TableHead>
                 </TableRow>
               </TableHeader>
@@ -232,6 +210,13 @@ export const CategoriesListPage: React.FC = () => {
                           لا توجد صورة
                         </div>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <VisibilitySelect
+                        visibleToClientApp={category.visible_to_client_app ?? false}
+                        visibleToAgentApp={category.visible_to_agent_app ?? false}
+                        onVisibilityChange={(v) => handleVisibilityChange(category.id, v)}
+                      />
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
@@ -284,26 +269,36 @@ export const CategoriesListPage: React.FC = () => {
         />
       )}
 
-      {/* حوار الحذف الجديد باستخدام UniversalDialog */}
-      <UniversalDialog
-        isOpen={deleteDialogOpen}
-        onClose={handleCancelDelete}
-        title="تأكيد الحذف"
-        description="هل أنت متأكد من حذف هذه الفئة؟ هذا الإجراء لا يمكن التراجع عنه. سيؤدي حذف الفئة إلى حذف جميع الفئات الفرعية والمنتجات المرتبطة بها."
-        footer={
-          <>
-            <DialogCloseButton onClick={handleCancelDelete} />
-            <DialogConfirmButton 
-              onClick={confirmDelete} 
-              text="حذف" 
-            />
-          </>
-        }
-      >
-        <div className="py-4 text-center">
-          <p className="text-red-500 font-bold">سيتم حذف هذه الفئة بشكل نهائي!</p>
-        </div>
-      </UniversalDialog>
+      {/* حوار الحذف */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => { setDeleteDialogOpen(open); if (!open) { setCategoryToDelete(null); setProductCountForDelete(0); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف الفئة الرئيسية</AlertDialogTitle>
+            <AlertDialogDescription>
+              {productCountForDelete > 0
+                ? `هذه الفئة تحتوي على ${productCountForDelete} منتج (ضمن فئاتها الفرعية أو مرتبط بها مباشرة). اختر أحد الخيارين:`
+                : 'هل أنت متأكد من حذف هذه الفئة؟'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel onClick={handleCancelDelete}>إلغاء</AlertDialogCancel>
+            {productCountForDelete > 0 ? (
+              <>
+                <AlertDialogAction onClick={confirmDeleteOnly} className="bg-muted text-muted-foreground">
+                  حذف الفئة فقط (المنتجات والفئات الفرعية تبقى بدون فئة رئيسية)
+                </AlertDialogAction>
+                <AlertDialogAction onClick={confirmDeleteWithProducts} className="bg-destructive text-destructive-foreground">
+                  حذف الفئة وجميع الفئات الفرعية والمنتجات تحتها
+                </AlertDialogAction>
+              </>
+            ) : (
+              <AlertDialogAction onClick={confirmDeleteOnly} className="bg-destructive text-destructive-foreground">
+                حذف
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }; 

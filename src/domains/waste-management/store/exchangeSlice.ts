@@ -70,13 +70,14 @@ export const addProductToExchange = createAsyncThunk(
 export const updateExchangeProduct = createAsyncThunk(
   "exchange/updateProduct",
   async (
-    { id, product }: { id: number; product: Partial<StockExchange> },
+    { id, product, userId }: { id: number; product: Partial<StockExchange>; userId?: string },
     { rejectWithValue },
   ) => {
     try {
       const updatedProduct = await exchangeService.updateExchangeProduct(
         id,
         product,
+        userId
       );
       if (!updatedProduct) {
         return rejectWithValue("فشل في تحديث المنتج في البورصة");

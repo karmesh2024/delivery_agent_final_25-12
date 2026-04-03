@@ -32,6 +32,8 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchAgents } from "@/store/agentsSlice";
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { useToast } from "@/shared/ui/toast";
+import { NotificationSender } from '@/components/notifications/NotificationSender';
+import { Bell } from "lucide-react";
 
 // تعريف نوع البيانات للمندوب الجديد
 interface NewAgentData {
@@ -249,6 +251,16 @@ export default function AgentsPage() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-2xl font-bold">مندوبي التوصيل</h1>
           <div className="flex items-center gap-4">
+            <NotificationSender 
+              department="system_ops" 
+              defaultTargetRole="delivery"
+              trigger={
+                <Button variant="outline" className="gap-2 bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700">
+                  <Bell className="h-4 w-4" />
+                  إرسال إشعار للمناديب
+                </Button>
+              }
+            />
             <AgentStatusFilter 
               statuses={statusFilters}
               activeStatus={activeStatus}

@@ -1,0 +1,378 @@
+{
+  "name": "Moharram Bey Content Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 8
+            }
+          ]
+        }
+      },
+      "id": "node-1",
+      "name": "Every 8 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=محرم+بك+الإسكندرية&hl=ar&gl=EG&ceid=EG:ar",
+        "options": {}
+      },
+      "id": "node-2",
+      "name": "Google News RSS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://gnews.io/api/v4/search?q=الإسكندرية محرم بك&lang=ar&country=eg&max=10&apikey=YOUR_API_KEY",
+        "options": {}
+      },
+      "id": "node-3",
+      "name": "GNews API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst allNews = [];\n\n// دمج كل الأخبار من المصادر المختلفة\nfor (const item of items) {\n  if (item.json.articles) {\n    // من GNews API\n    for (const article of item.json.articles) {\n      allNews.push({\n        title: article.title,\n        description: article.description || '',\n        url: article.url,\n        source: article.source.name,\n        publishedAt: article.publishedAt,\n        image: article.image || ''\n      });\n    }\n  } else if (item.json.items) {\n    // من Google RSS\n    for (const rssItem of item.json.items) {\n      allNews.push({\n        title: rssItem.title,\n        description: rssItem.description || '',\n        url: rssItem.link,\n        source: 'Google News',\n        publishedAt: rssItem.pubDate,\n        image: ''\n      });\n    }\n  }\n}\n\n// إزالة المكررات\nconst uniqueNews = allNews.filter((item, index, self) =>\n  index === self.findIndex((t) => t.title === item.title)\n);\n\n// ترتيب حسب التاريخ\nuniqueNews.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));\n\n// أخذ أحدث 5 أخبار\nconst topNews = uniqueNews.slice(0, 5);\n\nreturn topNews.map(news => ({ json: news }));"
+      },
+      "id": "node-4",
+      "name": "Merge & Filter News",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "groqApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.apiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "qwen2.5-7b-instruct"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{ role: 'system', content: 'أنت محلل محتوى إبداعي متخصص في منطقة محرم بك بالإسكندرية. مهمتك تحليل الأخبار واقتراح محتوى جذاب لوسائل التواصل الاجتماعي.' }, { role: 'user', content: `الخبر: ${$json.title}\\n\\nالتفاصيل: ${$json.description}\\n\\nالمصدر: ${$json.source}\\n\\nالمطلوب:\\n1. ملخص جذاب في سطرين (بأسلوب شبابي)\\n2. 3 أفكار بوستات فيسبوك مختلفة (رسمي، شبابي، تفاعلي)\\n3. 5 هاشتاجات عربية مناسبة\\n4. اقتراح نوع الصورة المناسبة\\n\\nالرد بصيغة JSON بهذا الشكل:\\n{\\n  \"summary\": \"...\",\\n  \"posts\": [\\n    {\"style\": \"رسمي\", \"text\": \"...\"},\\n    {\"style\": \"شبابي\", \"text\": \"...\"},\\n    {\"style\": \"تفاعلي\", \"text\": \"...\"}\\n  ],\\n  \"hashtags\": [\"#...\", \"#...\"],\\n  \"image_suggestion\": \"...\"\\n}` }] }}"
+            },
+            {
+              "name": "temperature",
+              "value": "0.7"
+            },
+            {
+              "name": "max_tokens",
+              "value": "1500"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-5",
+      "name": "Qwen Analysis (Groq)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// استخراج النتيجة من Groq API\nconst response = $input.item.json.choices[0].message.content;\n\n// محاولة parse JSON\nlet aiResult;\ntry {\n  // إزالة markdown code blocks إن وجدت\n  const cleanedResponse = response.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  aiResult = JSON.parse(cleanedResponse);\n} catch (e) {\n  // إذا فشل التحليل، استخدم regex للاستخراج\n  aiResult = {\n    summary: response.substring(0, 200),\n    posts: [\n      { style: 'default', text: response.substring(0, 280) }\n    ],\n    hashtags: ['#محرم_بك', '#الإسكندرية'],\n    image_suggestion: 'صورة عامة للمنطقة'\n  };\n}\n\n// دمج البيانات الأصلية مع نتيجة AI\nconst originalData = $input.item.json;\n\nreturn {\n  json: {\n    ...originalData,\n    ai_analysis: aiResult,\n    processed_at: new Date().toISOString()\n  }\n};"
+      },
+      "id": "node-6",
+      "name": "Parse AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.together.xyz/v1/images/generations",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "togetherAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.apiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "black-forest-labs/FLUX.1-schnell"
+            },
+            {
+              "name": "prompt",
+              "value": "=Egyptian city scene, {{ $json.ai_analysis.image_suggestion }}, Moharram Bek Alexandria, modern urban photography, high quality, 1080x1080, vibrant colors, social media post style"
+            },
+            {
+              "name": "width",
+              "value": "1080"
+            },
+            {
+              "name": "height",
+              "value": "1080"
+            },
+            {
+              "name": "steps",
+              "value": "4"
+            },
+            {
+              "name": "n",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-7",
+      "name": "Generate Image (Together AI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item.json;\nconst imageUrl = item.data?.[0]?.url || '';\n\n// إعداد البيانات للحفظ\nconst posts = item.ai_analysis.posts.map((post, index) => ({\n  json: {\n    news_title: item.title,\n    news_url: item.url,\n    news_source: item.source,\n    published_at: item.publishedAt,\n    post_style: post.style,\n    post_text: post.text,\n    hashtags: item.ai_analysis.hashtags.join(' '),\n    image_url: imageUrl,\n    summary: item.ai_analysis.summary,\n    status: 'pending_review',\n    created_at: new Date().toISOString()\n  }\n}));\n\nreturn posts;"
+      },
+      "id": "node-8",
+      "name": "Prepare Posts Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": "YOUR_NOTION_DATABASE_ID",
+        "title": "={{ $json.news_title }}",
+        "properties": {
+          "customProperty": [
+            {
+              "key": "العنوان",
+              "type": "title",
+              "value": "={{ $json.news_title }}"
+            },
+            {
+              "key": "نص البوست",
+              "type": "richText",
+              "value": "={{ $json.post_text }}"
+            },
+            {
+              "key": "الأسلوب",
+              "type": "select",
+              "value": "={{ $json.post_style }}"
+            },
+            {
+              "key": "الهاشتاجات",
+              "type": "richText",
+              "value": "={{ $json.hashtags }}"
+            },
+            {
+              "key": "رابط الصورة",
+              "type": "url",
+              "value": "={{ $json.image_url }}"
+            },
+            {
+              "key": "المصدر",
+              "type": "richText",
+              "value": "={{ $json.news_source }}"
+            },
+            {
+              "key": "رابط الخبر",
+              "type": "url",
+              "value": "={{ $json.news_url }}"
+            },
+            {
+              "key": "الحالة",
+              "type": "select",
+              "value": "للمراجعة"
+            },
+            {
+              "key": "التاريخ",
+              "type": "date",
+              "value": "={{ $json.created_at }}"
+            }
+          ]
+        }
+      },
+      "id": "node-9",
+      "name": "Save to Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🔔 *بوست جديد جاهز للمراجعة!*\n\n📰 *الخبر:* {{ $json.news_title }}\n\n✍️ *الأسلوب:* {{ $json.post_style }}\n\n📝 *نص البوست:*\n{{ $json.post_text }}\n\n🏷️ *الهاشتاجات:*\n{{ $json.hashtags }}\n\n📷 *الصورة:* {{ $json.image_url }}\n\n🔗 *المصدر:* {{ $json.news_source }}\n\n⏰ *وقت الإنشاء:* {{ $json.created_at }}\n\n👉 راجع في Notion وافق على النشر!",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "node-10",
+      "name": "Send Telegram Notification",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1850, 300]
+    },
+    {
+      "parameters": {
+        "content": "## 🎯 Moharram Bey Content Automation\n\n### Workflow Flow:\n1️⃣ Schedule trigger (every 8 hours)\n2️⃣ Fetch news from multiple sources\n3️⃣ Merge and filter top 5 news\n4️⃣ AI analysis with Qwen (via Groq)\n5️⃣ Generate social media posts\n6️⃣ Create images with AI\n7️⃣ Save to Notion for review\n8️⃣ Send Telegram notification\n\n### Required Setup:\n- Groq API key (free)\n- Together AI API key ($25 free credit)\n- Notion database\n- Telegram bot token\n- GNews API key (free tier)\n\n### Notes:\n- Runs automatically every 8 hours\n- Processes 5 news items per run\n- Generates 3 post variations per news\n- Creates 1 AI image per news\n- All content requires human review before publishing"
+      },
+      "id": "node-11",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [250, 80]
+    }
+  ],
+  "connections": {
+    "Every 8 Hours": {
+      "main": [
+        [
+          {
+            "node": "Google News RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "GNews API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google News RSS": {
+      "main": [
+        [
+          {
+            "node": "Merge & Filter News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GNews API": {
+      "main": [
+        [
+          {
+            "node": "Merge & Filter News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge & Filter News": {
+      "main": [
+        [
+          {
+            "node": "Qwen Analysis (Groq)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qwen Analysis (Groq)": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Generate Image (Together AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image (Together AI)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Posts Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Posts Data": {
+      "main": [
+        [
+          {
+            "node": "Save to Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Notion": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-02-17T00:00:00.000Z",
+  "versionId": "1"
+}

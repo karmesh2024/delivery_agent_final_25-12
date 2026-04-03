@@ -224,38 +224,12 @@ export function LeafletMap({
       if (marker) marker.remove();
     });
     
-    // إضافة سجلات تصحيح لفحص بيانات المندوبين
-    console.log(`LeafletMap (${mapId}): إجمالي المندوبين قبل التصفية: ${agents.length}`);
-    
-    // فحص بيانات المندوبين
-    agents.forEach((agent, index) => {
-      if (index < 5) { // فحص أول 5 مندوبين فقط لتجنب سجلات كثيرة
-        console.log(`LeafletMap (${mapId}): مندوب #${index + 1}:`, {
-          id: agent.id,
-          name: agent.name,
-          hasLocation: !!agent.location,
-          location: agent.location,
-        });
-      }
-    });
-    
-    // تعديل الفلتر ليكون أكثر تساهلاً
     const validAgents = agents.filter(agent => 
       agent && agent.location &&
       typeof agent.location.lat === 'number' &&
       typeof agent.location.lng === 'number' &&
-      // تخفيف شرط الإحداثيات الصفرية للتجربة
       (agent.location.lat !== 0 || agent.location.lng !== 0)
     );
-    
-    console.log(`LeafletMap (${mapId}): قبل التصفية: ${agents.length}, بعد التصفية: ${validAgents.length} مندوب صالح`);
-    
-    // إذا كان هناك مندوبون صالحون، طباعة بياناتهم
-    if (validAgents.length > 0) {
-      console.log(`LeafletMap (${mapId}): أول مندوب صالح:`, validAgents[0]);
-    } else {
-      console.log(`LeafletMap (${mapId}): لا يوجد مندوبون صالحون بعد التصفية`);
-    }
     
     // انتظر حتى تكون الخريطة جاهزة تماماً قبل إضافة markers
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -424,19 +398,14 @@ export function LeafletMap({
     }
   }, [mapInstance, isMapReady, center, zoom]);
 
-  // سجل تصحيح عند تلقي البيانات (فقط عند تغيير البيانات فعلياً)
   const prevAgentsRef = useRef<string>('');
   useEffect(() => {
     const agentsKey = JSON.stringify(agents.map(a => ({ id: a.id, hasLocation: !!a.location })));
-    if (agentsKey === prevAgentsRef.current) return; // لا تسجل إذا لم تتغير البيانات
+    if (agentsKey === prevAgentsRef.current) return;
     
     prevAgentsRef.current = agentsKey;
-    console.log(`LeafletMap (${mapId}): تم استلام المندوبين:`, agents.length);
-    console.log(`LeafletMap (${mapId}): المندوبون بمواقع صالحة:`, agents.filter(a => a.location).length);
     
-    // إذا كانت الخريطة جاهزة وتم استلام بيانات المندوبين، قم بتحديث العلامات
     if (mapInstance && isMapReady && agents.length > 0 && !showLocationsOnly) {
-      console.log(`LeafletMap (${mapId}): تحديث علامات المندوبين بعد تغيير البيانات`);
       
       // إزالة العلامات الحالية
       agentMarkersRef.current.forEach(marker => {

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { useAppDispatch } from '@/store/hooks';
 import { 
   addCategory, 
   updateCategory, 
@@ -25,9 +25,6 @@ interface CategoryFormProps {
 export const CategoryForm: React.FC<CategoryFormProps> = ({ categoryId, isOpen, onClose }) => {
   const dispatch = useAppDispatch();
   const { toast } = useToast();
-  
-  // Since productCategories state doesn't exist, we'll handle form data directly
-  const [currentCategory, setCurrentCategory] = useState<Partial<Category> | null>(null);
 
   const [formData, setFormData] = useState<Partial<Category>>({
     name: '',
@@ -39,47 +36,41 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ categoryId, isOpen, 
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   useEffect(() => {
-    // إذا كانت هناك عملية تعديل، قم بجلب بيانات الفئة
-    if (categoryId) {
-      dispatch(fetchCategoryById(categoryId))
-        .unwrap()
-        .then(category => {
-            setCurrentCategory(category);
-            if (category) {
-              setFormData({
-                name: category.name || '',
-                description: category.description || '',
-                image_url: category.image_url || '',
-              });
-              if (category.image_url) {
-                setPreviewImage(category.image_url);
-              }
-            }
-          })
-        .catch(error => {
-          console.error('Error fetching category:', error);
-          toast({
-            title: "خطأ",
-            description: "فشل في جلب بيانات الفئة",
-            variant: "destructive",
-          });
-        });
-    }
-  }, [categoryId, dispatch, toast]);
+    // مهم: لا نعيد تهيئة النموذج في كل re-render حتى لا يمنع الكتابة في textarea
+    if (!isOpen) return;
 
-  useEffect(() => {
-    // تحديث نموذج البيانات عند استلام بيانات الفئة
-    if (categoryId && currentCategory) {
-      setFormData({
-        name: currentCategory.name || '',
-        description: currentCategory.description || '',
-        image_url: currentCategory.image_url || '',
-      });
-      if (currentCategory.image_url) {
-        setPreviewImage(currentCategory.image_url);
-      }
+    if (!categoryId) {
+      // إضافة فئة جديدة
+      setFormData({ name: '', description: '', image_url: '' });
+      setSelectedFile(null);
+      setPreviewImage(null);
+      return;
     }
-  }, [categoryId, currentCategory]);
+
+    // تعديل فئة موجودة
+    dispatch(fetchCategoryById(categoryId))
+      .unwrap()
+      .then((category) => {
+        if (!category) return;
+        setFormData({
+          name: category.name || '',
+          description: category.description || '',
+          image_url: category.image_url || '',
+        });
+        setPreviewImage(category.image_url || null);
+        setSelectedFile(null);
+      })
+      .catch((error) => {
+        console.error('Error fetching category:', error);
+        toast({
+          title: "خطأ",
+          description: "فشل في جلب بيانات الفئة",
+          variant: "destructive",
+        });
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryId, isOpen, dispatch]);
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -210,11 +201,36 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ categoryId, isOpen, 
                 <img
                   src={previewImage}
                   alt="معاينة"
-                  className="w-24 h-24 object-cover rounded-md"
+                  className="w-24 h-24 object-cover rounded-md border border-gray-300"
+                />
+              </div>
+            )}
+            {formData.image_url && !previewImage && (
+              <div className="flex justify-center mt-2">
+                <img
+                  src={formData.image_url}
+                  alt="الصورة الحالية"
+                  className="w-24 h-24 object-cover rounded-md border border-gray-300"
                 />
               </div>
             )}
           </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-6">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            إلغاء
+          </Button>
+          <Button
+            type="submit"
+            disabled={isSubmitting || !formData.name}
+          >
+            {isSubmitting ? 'جاري الحفظ...' : (categoryId ? 'تحديث' : 'إضافة')}
+          </Button>
         </div>
       </form>
     </div>

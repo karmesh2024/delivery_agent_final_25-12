@@ -54,21 +54,28 @@ export const priceApprovalService = {
         priceChangePercentage = ((request.new_price - request.old_price) / request.old_price) * 100;
       }
 
+      // التأكد من وجود requested_by
+      if (!request.requested_by) {
+        toast.error('لم يتم تحديد المستخدم مقدم الطلب');
+        return null;
+      }
+
       const approvalRequest: Omit<PriceApprovalRequest, 'id' | 'created_at'> = {
         ...request,
         price_change_percentage: priceChangePercentage,
         status: 'pending',
       };
 
-      const { data, error } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { data, error } = await supabase
         .from('waste_price_approval_requests')
         .insert([approvalRequest])
         .select()
         .single();
 
       if (error) {
-        console.error('خطأ في إنشاء طلب الموافقة:', error);
-        toast.error('فشل في إنشاء طلب الموافقة');
+        console.error('خطأ في إنشاء طلب الموافقة:', JSON.stringify(error, null, 2));
+        toast.error(`فشل في إنشاء طلب الموافقة: ${error.message || 'خطأ غير معروف'}`);
         return null;
       }
 
@@ -90,7 +97,8 @@ export const priceApprovalService = {
         return [];
       }
 
-      const { data, error } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { data, error } = await supabase
         .from('waste_price_approval_requests')
         .select('*')
         .eq('status', 'pending')
@@ -123,7 +131,8 @@ export const priceApprovalService = {
       }
 
       // جلب طلب الموافقة
-      const { data: request, error: fetchError } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { data: request, error: fetchError } = await supabase
         .from('waste_price_approval_requests')
         .select('*')
         .eq('id', requestId)
@@ -136,7 +145,8 @@ export const priceApprovalService = {
       }
 
       // تحديث حالة الطلب
-      const { error: updateError } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { error: updateError } = await supabase
         .from('waste_price_approval_requests')
         .update({
           status: 'approved',
@@ -154,7 +164,8 @@ export const priceApprovalService = {
 
       // تطبيق تغيير السعر في stock_exchange
       if (request.stock_exchange_id) {
-        const { error: priceUpdateError } = await supabase!
+        if (!supabase) throw new Error('Supabase client is not initialized');
+        const { error: priceUpdateError } = await supabase
           .from('stock_exchange')
           .update({
             buy_price: request.new_price,
@@ -170,7 +181,8 @@ export const priceApprovalService = {
         }
       } else {
         // إنشاء سجل جديد في stock_exchange
-        const { error: createError } = await supabase!
+        if (!supabase) throw new Error('Supabase client is not initialized');
+        const { error: createError } = await supabase
           .from('stock_exchange')
           .insert([{
             product_id: request.waste_material_id,
@@ -215,7 +227,8 @@ export const priceApprovalService = {
         return false;
       }
 
-      const { error } = await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      const { error } = await supabase
         .from('waste_price_approval_requests')
         .update({
           status: 'rejected',
@@ -247,7 +260,8 @@ export const priceApprovalService = {
     try {
       if (!supabase || !request.stock_exchange_id) return;
 
-      await supabase!
+      if (!supabase) throw new Error('Supabase client is not initialized');
+      await supabase
         .from('exchange_price_history')
         .insert([{
           stock_exchange_id: request.stock_exchange_id,

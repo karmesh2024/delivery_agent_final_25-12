@@ -4,7 +4,7 @@ import React from 'react';
 import { DashboardLayout } from '@/shared/layouts/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
-import { FiDollarSign, FiTrendingUp, FiPieChart, FiFileText, FiTarget, FiShoppingBag, FiTag } from "react-icons/fi";
+import { FiDollarSign, FiTrendingUp, FiPieChart, FiFileText, FiTarget, FiShoppingBag, FiTag, FiCheckCircle, FiCreditCard, FiList, FiShield, FiGift } from "react-icons/fi";
 import Link from "next/link";
 
 export default function FinancialManagement() {
@@ -171,6 +171,167 @@ export default function FinancialManagement() {
               <Link href="/financial-management/points">
                 <Button className="w-full">
                   إدارة النقاط
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* بطاقة جلسات التجميع */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center text-xl">
+                <FiCheckCircle className="mr-2 text-green-500" />
+                جلسات التجميع
+              </CardTitle>
+              <CardDescription>
+                اعتماد وإدارة جلسات تجميع المخلفات
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-4">
+                مراجعة واعتماد جلسات التجميع لإتاحة السحب للعملاء.
+              </p>
+              <Link href="/financial-management/sessions">
+                <Button className="w-full">
+                  إدارة الجلسات
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* بطاقة طلبات السحب */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center text-xl">
+                <FiCreditCard className="mr-2 text-blue-500" />
+                طلبات السحب
+              </CardTitle>
+              <CardDescription>
+                مراجعة ومعالجة طلبات السحب والاستبدال
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-4">
+                الموافقة أو رفض طلبات سحب النقاط من العملاء.
+              </p>
+              <Link href="/financial-management/redemptions">
+                <Button className="w-full">
+                  إدارة طلبات السحب
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* بطاقة سجل المعاملات */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center text-xl">
+                <FiList className="mr-2 text-gray-500" />
+                سجل المعاملات
+              </CardTitle>
+              <CardDescription>
+                تتبع جميع حركات النقاط والمحفظة
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-4">
+                Audit Log لجميع معاملات النقاط والمحفظة المالية.
+              </p>
+              <Link href="/financial-management/audit-log">
+                <Button className="w-full">
+                  عرض السجل
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* بطاقة الاحتياطيات المالية */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center text-xl">
+                <FiTrendingUp className="mr-2 text-emerald-500" />
+                الاحتياطيات المالية
+              </CardTitle>
+              <CardDescription>
+                إدارة الالتزامات والأصول والنسب المالية
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-4">
+                متابعة الاحتياطيات المالية، نسبة التغطية، والسيولة المتاحة.
+              </p>
+              <Link href="/financial-management/reserves">
+                <Button className="w-full">
+                  عرض الاحتياطيات
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* بطاقة الربحية */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center text-xl">
+                <FiTrendingUp className="mr-2 text-green-500" />
+                الربحية
+              </CardTitle>
+              <CardDescription>
+                متابعة الربحية من جلسات التجميع
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-4">
+                عرض إجمالي الشراء والبيع والربح وهامش الربح من جميع الجلسات.
+              </p>
+              <Link href="/financial-management/profitability">
+                <Button className="w-full">
+                  عرض الربحية
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* بطاقة حدود السحب */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center text-xl">
+                <FiShield className="mr-2 text-orange-500" />
+                حدود السحب
+              </CardTitle>
+              <CardDescription>
+                إدارة الحدود اليومية والأسبوعية والشهرية للسحب
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-4">
+                تحديد الحد الأقصى للمبلغ وعدد المعاملات المسموحة للعملاء.
+              </p>
+              <Link href="/financial-management/withdrawal-limits">
+                <Button className="w-full">
+                  إدارة الحدود
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* بطاقة قواعد store_points */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center text-xl">
+                <FiGift className="mr-2 text-purple-500" />
+                قواعد نقاط المتجر
+              </CardTitle>
+              <CardDescription>
+                إدارة قواعد منح نقاط البونص للعملاء
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-4">
+                إنشاء وإدارة قواعد منح نقاط البونص مثل نقاط ترحيبية، بونص حسب الفئة، وعروض موسمية.
+              </p>
+              <Link href="/financial-management/store-points-rules">
+                <Button className="w-full">
+                  إدارة القواعد
                 </Button>
               </Link>
             </CardContent>

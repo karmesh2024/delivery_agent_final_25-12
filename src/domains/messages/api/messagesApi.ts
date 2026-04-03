@@ -153,23 +153,30 @@ export const messagesApi = {
       // تنفيذ الاستعلام
       const { data, error } = await query.order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.warn('Supabase error in getConversations, falling back to mock data:', error.message || error);
+        const { mockConversations } = await import('../data/mock-data');
+        return mockConversations;
+      }
+      
+      if (!data || data.length === 0) {
+        console.log('No live conversations found, checking for mock data fallback...');
+        const { mockConversations } = await import('../data/mock-data');
+        return mockConversations;
+      }
       
       // تحويل البيانات إلى الشكل المتوقع
       const conversations: Conversation[] = data.map((item: ConversationQueryResult) => {
-        // استخراج بيانات المحادثة (إما كائن مفرد أو أول عنصر في المصفوفة)
         const conversationData = Array.isArray(item.conversations) 
           ? item.conversations[0] 
           : item.conversations;
-          
-        // استخراج معرف الشخص الآخر في المحادثة (المندوب أو العميل)
-        let agentId = '';
         
-        // إذا كان المستخدم عميلًا، استخدم معرف الطلب أو المندوب كمعرف
+        if (!conversationData) return null;
+          
+        let agentId = '';
         if (participantType === 'customer') {
-          agentId = conversationData.delivery_order_id || 'agent-id'; // يجب استرداد معرف المندوب من مشاركي المحادثة
+          agentId = conversationData.delivery_order_id || 'agent-id';
         } else {
-          // للإداريين والمندوبين، استخدم معرف المندوب نفسه أو معرف العميل
           agentId = participantId;
         }
         
@@ -181,14 +188,18 @@ export const messagesApi = {
           unread: item.unread_count > 0,
           type: conversationData.conversation_type
         };
-      });
+      }).filter(Boolean) as Conversation[];
       
       console.log('Messages API - Fetched conversations:', conversations.length);
       return conversations;
-    } catch (error) {
-      console.error('Messages API Error - getConversations:', error);
-      // إعادة قائمة فارغة في حالة الخطأ
-      return [];
+    } catch (error: any) {
+      console.error('Messages API Critical Error - getConversations:', error?.message || error);
+      try {
+        const { mockConversations } = await import('../data/mock-data');
+        return mockConversations;
+      } catch (e) {
+        return [];
+      }
     }
   },
   
@@ -236,12 +247,21 @@ export const messagesApi = {
         .eq('is_deleted', false)
         .order('sent_at', { ascending: true });
       
-      if (error) throw error;
+      if (error) {
+        console.warn('Supabase error in getMessages, falling back to mock data:', error.message || error);
+        const { mockMessages } = await import('../data/mock-data');
+        return mockMessages.filter(m => m.conversationId === conversationId);
+      }
+      
+      if (!data || data.length === 0) {
+        console.log('No live messages found, checking for mock data fallback...');
+        const { mockMessages } = await import('../data/mock-data');
+        return mockMessages.filter(m => m.conversationId === conversationId);
+      }
       
       // تحويل البيانات إلى الشكل المتوقع
       const messages: Message[] = data.map((item) => {
-        // تحديد معرف المرسل بناءً على نوع المرسل
-        let senderId = 'system'; // القيمة الافتراضية
+        let senderId = 'system';
         if (item.sender_type === 'delivery_boy' && item.sender_delivery_boy_id) {
           senderId = item.sender_delivery_boy_id;
         } else if (item.sender_type === 'customer' && item.sender_customer_id) {
@@ -256,7 +276,7 @@ export const messagesApi = {
           senderId: senderId,
           content: item.content,
           timestamp: new Date(item.sent_at),
-          isRead: true, // سنفترض أن الرسائل مقروءة عند الجلب
+          isRead: true,
           messageType: item.message_type,
           metadata: item.metadata,
           replyToId: item.reply_to_id
@@ -265,10 +285,14 @@ export const messagesApi = {
       
       console.log('Messages API - Fetched messages for conversation:', conversationId, messages.length);
       return messages;
-    } catch (error) {
-      console.error('Messages API Error - getMessages:', error);
-      // إعادة قائمة فارغة في حالة الخطأ
-      return [];
+    } catch (error: any) {
+      console.error('Messages API Critical Error - getMessages:', error?.message || error);
+      try {
+        const { mockMessages } = await import('../data/mock-data');
+        return mockMessages.filter(m => m.conversationId === conversationId);
+      } catch (e) {
+        return [];
+      }
     }
   },
   

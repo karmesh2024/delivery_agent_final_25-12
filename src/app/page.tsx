@@ -31,7 +31,8 @@ import {
   FiDollarSign,
   FiBox,
   FiTrendingUp,
-  FiSettings
+  FiSettings,
+  FiRefreshCw
 } from "react-icons/fi";
 import { IconType } from "react-icons";
 import { safeFormatCurrency } from "@/lib/utils";
@@ -72,14 +73,11 @@ export default function HomePage() {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showAlternateMap, setShowAlternateMap] = useState(false);
-  const [isClient, setIsClient] = useState(false);
+  // زر مؤقت - مزامنة الكتالوج الأولية - احذف هذا السطر والسطر التالي بعد المزامنة
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ synced: number; failed: number; skipped: number } | null>(null);
 
   const dispatch = useAppDispatch();
-
-  // تحديث حالة isClient عند تحميل المكون على العميل
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   // تحديد المندوبين المصفاة
   const filteredAgents = useMemo(() => {
@@ -113,10 +111,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!reduxLoading) { // تأكد من أن التحقق الأولي قد تم بواسطة AuthProvider
       if (!reduxIsAuthenticated) {
-        console.log('HomePage: حالة المصادقة - غير مصادق، يتم التوجيه إلى صفحة تسجيل الدخول');
         router.push('/login');
-      } else {
-        console.log('HomePage: حالة المصادقة - مصادق. عرض المحتوى.');
       }
     }
   }, [reduxIsAuthenticated, reduxLoading, router]);
@@ -124,8 +119,7 @@ export default function HomePage() {
   // جلب البيانات فقط إذا كان المستخدم مصادقًا
   useEffect(() => {
     if (reduxIsAuthenticated) {
-      console.log('HomePage: جلب بيانات المندوبين والطلبات');
-      setLoading(true); // تعيين حالة التحميل إلى true قبل جلب البيانات
+      setLoading(true);
       dispatch(fetchAgents());
       dispatch(fetchOrders());
     }
@@ -134,17 +128,13 @@ export default function HomePage() {
   // تحديث حالة التحميل عندما تصل بيانات المندوبين
   useEffect(() => {
     if (agentsFromRedux.length > 0) {
-      console.log('HomePage: تم استلام بيانات المندوبين، إنهاء حالة التحميل');
       setLoading(false);
     }
   }, [agentsFromRedux]);
 
   // تحديث الطلبات من Redux عندما تتغير
   useEffect(() => {
-    console.log('HomePage: تم استلام الطلبات من Redux:', ordersFromRedux.length);
     if (ordersFromRedux.length > 0) {
-      console.log('HomePage: تحديث الطلبات المحلية من Redux');
-      // تحويل الطلبات من Redux إلى النوع المتوقع
       setOrders(ordersFromRedux as unknown as Order[]);
       setLoading(false);
     }
@@ -167,27 +157,6 @@ export default function HomePage() {
   // إذا لم يكن المستخدم مصادقًا ولا يوجد تحميل، سيتم التوجيه بواسطة AuthProvider
   if (!reduxIsAuthenticated && !reduxLoading) {
     return null; // أو أي عنصر احتياطي إذا كنت ترغب في عرض شيء آخر مؤقتًا
-  }
-
-  // طباعة معلومات تصحيح فقط على العميل
-  if (isClient) {
-    console.log('HomePage: عدد المندوبين من Redux:', agentsFromRedux.length);
-    console.log('HomePage: المندوبون بمواقع صالحة:', agentsFromRedux.filter(a => a.location).length);
-    console.log('HomePage: عدد الطلبات المحلية:', orders.length);
-    console.log('HomePage: عدد الطلبات من Redux:', ordersFromRedux.length);
-    console.log('HomePage: عدد المندوبين بعد التصفية:', filteredAgents.length);
-    console.log('HomePage: المندوبون المصفاة بمواقع صالحة:', filteredAgents.filter(a => a.location).length);
-    console.log('HomePage: عدد الطلبات بعد التصفية:', filteredOrders.length, 'حالة التصفية:', activeOrderTab);
-    
-    // طباعة تفاصيل الطلبات للتصحيح
-    if (orders.length > 0) {
-      console.log('HomePage: تفاصيل الطلب الأول:', {
-        id: orders[0].id,
-        status: orders[0].status,
-        customer_name: orders[0].customer_name,
-        total_amount: orders[0].total_amount
-      });
-    }
   }
 
   // تحويل حالة الطلب إلى حالة موقع التوصيل
@@ -255,6 +224,26 @@ export default function HomePage() {
 
   const handleOrderClick = (order: Order) => {
     setSelectedOrder(order);
+  };
+
+  // زر مؤقت - مزامنة الكتالوج الأولية - احذف هذه الدالة بعد المزامنة
+  const handleSyncCatalog = async () => {
+    setSyncLoading(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch('/api/admin/sync-catalog', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setSyncResult({ synced: data.synced, failed: data.failed, skipped: data.skipped });
+        toast.success(data.message || `مُزامَن: ${data.synced}، فشل: ${data.failed}، مُتخطّى: ${data.skipped}`);
+      } else {
+        toast.error(data.error || 'فشلت المزامنة');
+      }
+    } catch (e) {
+      toast.error('حدث خطأ أثناء المزامنة');
+    } finally {
+      setSyncLoading(false);
+    }
   };
 
   const getStatusColor = (status: string | undefined) => {
@@ -377,6 +366,31 @@ export default function HomePage() {
       >
 
         <div className="space-y-6">
+        {/* زر مؤقت - مزامنة الكتالوج الأولية - احذف هذا القسم بالكامل بعد تشغيل المزامنة */}
+        <Card className="border-amber-200 bg-amber-50/50">
+          <CardContent className="py-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <FiRefreshCw className="h-5 w-5 text-amber-600" />
+              <span className="text-sm font-medium">مزامنة الكتالوج الأولية (مؤقت)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {syncResult && (
+                <span className="text-xs text-muted-foreground">
+                  مُزامَن: {syncResult.synced} | فشل: {syncResult.failed} | مُتخطّى: {syncResult.skipped}
+                </span>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSyncCatalog}
+                disabled={syncLoading}
+              >
+                {syncLoading ? 'جاري المزامنة...' : 'تشغيل المزامنة'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {keyMetrics.map((metric, index) => (

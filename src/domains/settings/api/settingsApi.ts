@@ -83,29 +83,35 @@ export const getUserSettings = async (userId: string): Promise<UserData | null> 
     }
     
     // الحصول على بيانات المستخدم الأساسية
+    // استخدام maybeSingle() بدلاً من single() للسماح بعدم وجود صف
     const { data: userData, error: userError } = await supabase!
       .from('users')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
+    // معالجة الخطأ أو عدم وجود بيانات
     if (userError) {
-      console.error(`Error fetching user data: ${JSON.stringify(userError)}`);
-      // استخدام البيانات الافتراضية في حالة وجود خطأ
+      // تجاهل خطأ PGRST116 (لا توجد صفوف) لأنه متوقع
+      if (userError.code !== 'PGRST116') {
+        console.error(`Error fetching user data: ${JSON.stringify(userError)}`);
+      }
+      // استخدام البيانات الافتراضية في حالة وجود خطأ أو عدم وجود بيانات
       return DEFAULT_USER_DATA;
     }
     
     if (!userData) {
-      console.warn(`No user data found for ID: ${userId}`);
+      console.warn(`No user data found for ID: ${userId}, using default data`);
       return DEFAULT_USER_DATA;
     }
 
     // الحصول على إعدادات الإشعارات
+    // استخدام maybeSingle() للسماح بعدم وجود صف
     const { data: notificationsData, error: notificationsError } = await supabase!
       .from('user_notification_settings')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (notificationsError && notificationsError.code !== 'PGRST116') {
       console.warn(`Error fetching notification settings: ${JSON.stringify(notificationsError)}`);

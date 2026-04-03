@@ -101,6 +101,12 @@ const ProductsPage: React.FC = () => {
                         className="w-full h-48 object-cover"
                       />
                     )
+                  ) : product.image_url ? (
+                    <img
+                      src={product.image_url}
+                      alt={product.name_ar || 'Product Image'}
+                      className="w-full h-48 object-cover"
+                    />
                   ) : (
                     <div className="w-full h-48 bg-gray-200 flex items-center justify-center text-gray-500">
                       لا توجد صورة
@@ -117,8 +123,8 @@ const ProductsPage: React.FC = () => {
                   <CardContent className="flex items-center justify-between pb-4">
                     <span className="text-xl font-bold text-primary">
                       {product.store_product_prices && product.store_product_prices.length > 0
-                        ? `${product.store_product_prices[0].price.toString()} جنيه مصري`
-                        : `${product.default_selling_price?.toString() || 'N/A'} جنيه مصري`}
+                        ? `${typeof product.store_product_prices[0].price === 'object' ? JSON.stringify(product.store_product_prices[0].price) : product.store_product_prices[0].price} جنيه مصري`
+                        : `${product.default_selling_price != null ? (typeof product.default_selling_price === 'object' ? (product.default_selling_price as any).d?.[0] || JSON.stringify(product.default_selling_price) : product.default_selling_price) : 'N/A'} جنيه مصري`}
                     </span>
                     <Button variant="outline" size="sm">عرض التفاصيل</Button>
                   </CardContent>
