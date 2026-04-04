@@ -3,13 +3,14 @@ import { ApprovedAgent, AgentStatus } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
-import { FiPhone, FiInfo, FiEdit } from 'react-icons/fi';
+import { FiPhone, FiInfo, FiEdit, FiTrash2 } from 'react-icons/fi';
 
 interface ApprovedAgentCardProps {
   agent: ApprovedAgent;
   onViewDetails: (agent: ApprovedAgent) => void;
   onCall: (agent: ApprovedAgent) => void;
   onEdit: (agent: ApprovedAgent) => void;
+  onDelete?: (agent: ApprovedAgent) => void;
   className?: string;
 }
 
@@ -18,6 +19,7 @@ export const ApprovedAgentCard: React.FC<ApprovedAgentCardProps> = ({
   onViewDetails,
   onCall,
   onEdit,
+  onDelete,
   className
 }) => {
   const getStatusColor = (status: AgentStatus) => {
@@ -99,17 +101,20 @@ export const ApprovedAgentCard: React.FC<ApprovedAgentCardProps> = ({
           <p>نوع المحفظة: {agent.wallet?.wallet_type || 'AGENT_WALLET'}</p>
         </CardDescription>
       </CardContent>
-      <CardFooter className="flex justify-end gap-2 p-4 pt-0">
+      <CardFooter className="flex justify-start gap-2 p-4 pt-0 rtl:flex-row-reverse">
+        <Button variant="destructive" size="sm" onClick={() => onDelete?.(agent)}>
+          <FiTrash2 className="h-4 w-4 ml-1" /> حذف
+        </Button>
         <Button variant="outline" size="sm" onClick={() => onCall(agent)}>
-          <FiPhone className="h-4 w-4 mr-2" /> اتصال
+          <FiPhone className="h-4 w-4 ml-1" /> اتصال
         </Button>
         <Button variant="outline" size="sm" onClick={() => onEdit(agent)}>
-          <FiEdit className="h-4 w-4 mr-2" /> تعديل
+          <FiEdit className="h-4 w-4 ml-1" /> تعديل
         </Button>
         <Button size="sm" onClick={() => onViewDetails(agent)}>
-          <FiInfo className="h-4 w-4 mr-2" /> التفاصيل
+          <FiInfo className="h-4 w-4 ml-1" /> التفاصيل
         </Button>
       </CardFooter>
     </Card>
   );
-}; 
+};

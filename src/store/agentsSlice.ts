@@ -91,6 +91,19 @@ export const createAgent = createAsyncThunk(
   }
 );
 
+// حذف مندوب توصيل
+export const deleteAgent = createAsyncThunk(
+  'agents/deleteAgent',
+  async (id: string, { rejectWithValue }) => {
+    try {
+      await agentsApi.delete(id);
+      return id;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'فشل في حذف المندوب');
+    }
+  }
+);
+
 // شريحة المندوبين
 const agentsSlice = createSlice({
   name: 'agents',
@@ -198,6 +211,23 @@ const agentsSlice = createSlice({
       .addCase(createAgent.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload as string || 'فشل في إضافة مندوب جديد';
+      })
+      // معالجة حذف مندوب
+      .addCase(deleteAgent.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(deleteAgent.fulfilled, (state, action: PayloadAction<string>) => {
+        state.status = 'succeeded';
+        const deletedId = action.payload;
+        state.items = state.items.filter(agent => agent.id !== deletedId);
+        state.activeAgents = state.activeAgents.filter(agent => agent.id !== deletedId);
+        if (state.selectedAgent?.id === deletedId) {
+          state.selectedAgent = null;
+        }
+      })
+      .addCase(deleteAgent.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload as string || 'فشل في حذف المندوب';
       });
   }
 });

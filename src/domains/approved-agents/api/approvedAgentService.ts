@@ -926,7 +926,7 @@ export const approvedAgentService = {
       const { error } = await supabase
         .from('join_requests')
         .update({ status: status })
-        .eq('id', requestId);
+        .eq('id', requestId); // If the column name is different, adjust accordingly.
 
       if (error) {
         console.error(`Error updating join request ${requestId} status to ${status}:`, error.message);
@@ -969,11 +969,6 @@ export const approvedAgentService = {
 
       // إنشاء كلمة مرور جديدة عشوائية
       const newPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase() + '@123';
-
-      // محاولة تحديث كلمة المرور باستخدام Admin API
-      // ملاحظة: هذا يتطلب Service Role Key ويجب أن يتم على السيرفر
-      // للآن، سنستخدم resetPasswordForEmail لإرسال رابط إعادة التعيين
-      // لكن بما أن المستخدم يريد "معرفة" كلمة المرور، سنستخدم طريقة أخرى
 
       // الحل البديل: استخدام API route على السيرفر
       const response = await fetch('/api/agents/reset-password', {
@@ -1022,4 +1017,27 @@ export const approvedAgentService = {
       return { password: null, error: errorMessage };
     }
   },
-}; 
+
+  /**
+   * يحذف وكيلاً معتمداً نهائياً من المصادقة وقاعدة البيانات.
+   * @param agentId معرف الوكيل.
+   * @returns نجاح العملية أو خطأ.
+   */
+  deleteApprovedAgent: async (agentId: string): Promise<{ success: boolean; error: string | null }> => {
+    try {
+      const response = await fetch(`/api/agents/${agentId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'فشل حذف الوكيل.' }));
+        return { success: false, error: errorData.message || 'فشل حذف الوكيل.' };
+      }
+
+      return { success: true, error: null };
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'حدث خطأ غير متوقع.';
+      return { success: false, error: errorMessage };
+    }
+  },
+};

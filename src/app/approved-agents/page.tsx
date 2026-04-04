@@ -7,7 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/shared/layouts/DashboardLayout';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchApprovedAgents } from '@/domains/approved-agents/store/approvedAgentsSlice';
+import { fetchApprovedAgents, deleteApprovedAgent } from '@/domains/approved-agents/store/approvedAgentsSlice';
 import { NewAgentPayload, AgentStatus, ApprovedAgent, DocumentType } from '@/types';
 import { useToast } from '@/shared/ui/toast';
 import { UniversalDialog } from '@/shared/ui/universal-dialog';
@@ -456,6 +456,35 @@ export default function ApprovedAgentsPage() {
 
   }, [stepCompletion, documentsUploadedCount, documentsTotalRequired]);
 
+  // دالة حذف الوكيل
+  const handleDeleteAgent = async (agentId: string) => {
+    if (window.confirm('هل أنت متأكد من حذف هذا الوكيل نهائياً؟ لا يمكن التراجع عن هذا الإجراء.')) {
+      try {
+        const resultAction = await dispatch(deleteApprovedAgent(agentId));
+        if (deleteApprovedAgent.fulfilled.match(resultAction)) {
+          toast({
+            title: "تم الحذف",
+            description: "تم حذف الوكيل بنجاح من النظام.",
+            type: "success",
+          });
+        } else {
+          toast({
+            title: "خطأ",
+            description: (resultAction.payload as string) || "فشل حذف الوكيل. يرجى المحاولة مرة أخرى.",
+            type: "error",
+          });
+        }
+      } catch (err) {
+        console.error("Error during agent deletion:", err);
+        toast({
+          title: "خطأ تقني",
+          description: "حدث خطأ غير متوقع أثناء محاولة الحذف.",
+          type: "error",
+        });
+      }
+    }
+  };
+
   // دالة مساعدة لتعريب أسماء المستندات
   const localizeDocumentType = (docType: string): string => {
     const docTypeMap: Record<string, string> = {
@@ -569,6 +598,7 @@ export default function ApprovedAgentsPage() {
                         setEditingAgent(agent);
                         setIsEditDialogOpen(true);
                       }}
+                      onDelete={(agent) => handleDeleteAgent(agent.id)}
                       className="h-full"
                     />
                   ))}
@@ -646,6 +676,7 @@ export default function ApprovedAgentsPage() {
                       setEditingAgent(agent);
                       setIsEditDialogOpen(true);
                     }}
+                    onDelete={(agent) => handleDeleteAgent(agent.id)}
                     className="h-full"
                   />
                 ))}

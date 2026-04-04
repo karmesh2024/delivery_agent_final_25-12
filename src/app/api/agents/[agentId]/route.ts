@@ -223,3 +223,56 @@ export async function PUT(
     });
   }
 }
+
+/**
+ * DELETE /api/agents/[agentId]
+ * 
+ * يقوم بحذف المندوب (حذف ناعم عن طريق تغيير الحالة) بصورة افتراضية
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ agentId: string }> },
+) {
+  const { agentId } = await params;
+
+  if (!agentId) {
+    return NextResponse.json({ error: "معرف المندوب مطلوب" }, { status: 400 });
+  }
+
+  try {
+    if (!supabaseServiceRole) {
+      return NextResponse.json({ error: "فشل الاتصال بقاعدة البيانات" }, { status: 500 });
+    }
+
+    const { data: agent, error: fetchError } = await supabaseServiceRole
+      .from("delivery_boys")
+      .select("id, status")
+      .eq("id", agentId)
+      .single();
+
+    if (fetchError || !agent) {
+      return NextResponse.json({ error: "المندوب غير موجود" }, { status: 404 });
+    }
+
+    const { error: updateError } = await supabaseServiceRole
+      .from("delivery_boys")
+      .update({ 
+        status: "inactive",
+        online_status: "offline",
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", agentId);
+
+    if (updateError) {
+      return NextResponse.json({ 
+        error: "فشل تحديث حالة المندوب",
+        details: updateError.message 
+      }, { status: 500 });
+    }
+
+    return NextResponse.json({ message: "تم حذف المندوب بنجاح" });
+
+  } catch (error) {
+    return NextResponse.json({ error: "حدث خطأ غير متوقع أثناء الحذف" }, { status: 500 });
+  }
+}

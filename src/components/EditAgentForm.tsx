@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Agent } from "@/types";
 import { useAppSelector, useAppDispatch } from "@/store/hooks";
-import { fetchAgents, updateAgentDetails } from "@/store/agentsSlice";
+import { fetchAgents, updateAgentDetails, deleteAgent } from "@/store/agentsSlice";
 import {
   Table,
   TableBody,
@@ -187,18 +187,29 @@ export function EditAgentForm() {
   const confirmDeleteAgent = async () => {
     if (!agentPendingDeletion) return;
     
-    // Actual deletion logic will go here
-    // For now, simulate and show a toast
-    console.log("Deleting agent (simulation):", agentPendingDeletion.id);
-    // dispatch(deleteAgent(agentPendingDeletion.id)); // Uncomment when deleteAgent action is ready
-    toast({ title: "نجاح (محاكاة)", description: `تم حذف المندوب ${agentPendingDeletion.name} بنجاح.` });
-    
-    // Optionally, if the deleted agent was selected for edit, clear the form
-    if (selectedAgentId === agentPendingDeletion.id) {
-      setSelectedAgentId(null);
+    try {
+      setIsSubmitting(true);
+      const resultAction = await dispatch(deleteAgent(agentPendingDeletion.id));
+      
+      if (deleteAgent.fulfilled.match(resultAction)) {
+        toast({ title: "نجاح", description: `تم حذف المندوب ${agentPendingDeletion.name} بنجاح.` });
+        
+        // إذا كان المندوب المحذوف هو نفسه المختار للتعديل، قم بإفراغ النموذج
+        if (selectedAgentId === agentPendingDeletion.id) {
+          setSelectedAgentId(null);
+          setFormData(null);
+        }
+      } else {
+        const error = resultAction.payload as string || "فشل حذف المندوب";
+        toast({ title: "خطأ", description: error, variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Error deleting agent:", error);
+      toast({ title: "خطأ", description: "حدث خطأ غير متوقع أثناء الحذف.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+      setIsConfirmDeleteDialogOpen(false); // This will trigger onOpenChange, which resets agentPendingDeletion
     }
-    
-    setIsConfirmDeleteDialogOpen(false); // This will trigger onOpenChange, which resets agentPendingDeletion
   };
 
   if (agentsStatus === 'loading' && agents.length === 0) {

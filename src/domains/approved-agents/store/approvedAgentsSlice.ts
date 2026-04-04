@@ -62,6 +62,18 @@ export const updateApprovedAgentDetails = createAsyncThunk(
   }
 );
 
+// Thunk لحذف وكيل معتمد
+export const deleteApprovedAgent = createAsyncThunk(
+  'approvedAgents/deleteApprovedAgent',
+  async (agentId: string, { rejectWithValue }) => {
+    const { success, error } = await approvedAgentService.deleteApprovedAgent(agentId);
+    if (!success) {
+      return rejectWithValue(error || 'فشل حذف الوكيل');
+    }
+    return agentId;
+  }
+);
+
 // إنشاء slice الوكلاء المعتمدين
 const approvedAgentsSlice = createSlice({
   name: 'approvedAgents',
@@ -71,6 +83,14 @@ const approvedAgentsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // حالات deleteApprovedAgent
+      .addCase(deleteApprovedAgent.fulfilled, (state, action: PayloadAction<string>) => {
+        state.items = state.items.filter(agent => agent.id !== action.payload);
+        state.status = 'succeeded';
+      })
+      .addCase(deleteApprovedAgent.rejected, (state, action) => {
+        state.error = (action.payload as string) || 'فشل حذف الوكيل المعتمد';
+      })
       // حالات fetchApprovedAgents
       .addCase(fetchApprovedAgents.pending, (state) => {
         state.status = 'loading';
