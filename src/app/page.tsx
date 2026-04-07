@@ -44,6 +44,7 @@ import { RootState } from '@/store';
 import { fetchAgents } from '@/store/agentsSlice';
 import { fetchOrders } from '@/store/ordersSlice';
 import Link from 'next/link';
+import DiscoveryFeed from "@/domains/zoon-os/components/DiscoveryFeed";
 
 /**
  * الصفحة الرئيسية للتطبيق (لوحة القيادة)
@@ -403,6 +404,11 @@ export default function HomePage() {
               change={metric.change}
             />
           ))}
+        </div>
+
+        {/* Proactive Intelligence - Zoon OS Pulse */}
+        <div className="mb-6">
+          <DiscoveryFeed />
         </div>
 
         {/* Main Dashboard Grid */}

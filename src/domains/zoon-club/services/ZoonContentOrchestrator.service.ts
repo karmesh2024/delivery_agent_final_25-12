@@ -1,4 +1,4 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 import { advancedPsychologicalEngine } from './zoonAdvancedPsychologicalEngine.service';
 
 /**
@@ -28,7 +28,7 @@ export interface ContentSettings {
 }
 
 class ZoonContentOrchestrator {
-  private supabase = createClientComponentClient();
+  private supabase = createClient();
 
   /**
    * 🏗️ عملية التأسيس أو التوليد الدوري لغرفة معينة

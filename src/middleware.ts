@@ -49,6 +49,27 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
       return securityResponse;
     }
 
+    // ── حماية مسار الـ Pulse الرئيسي ─────────────
+    if (path === '/api/zoon/discovery/pulse') {
+      const isVercelCron   = request.headers.get('x-vercel-cron') === '1';
+      const authorization  = request.headers.get('authorization') ?? '';
+      const secret = process.env.CRON_SECRET ?? '';
+      const expectedBearer = `Bearer ${secret}`;
+      const hasValidSecret = secret.length > 0 && authorization === expectedBearer;
+
+      if (!isVercelCron && !hasValidSecret) {
+        console.warn(`[Security] Unauthorized pulse attempt from: ${clientIP}`);
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      if (method !== 'POST') {
+        return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+      }
+      
+      // تجاوز باقي الفحوصات لهذا المسار الخاص بالتنفيذ الدوري
+      return NextResponse.next();
+    }
+
     // 🔐 التحقق من المصادقة والصلاحيات
     const authResponse = await checkAuthentication(request, path, method);
     if (authResponse) {

@@ -34,10 +34,13 @@ export default function ZoonPromptManager() {
       setLoading(true);
       const res = await fetch('/api/zoon/prompts');
       const data = await res.json();
-      if (res.ok) {
+      if (res.ok && Array.isArray(data)) {
         setPrompts(data);
+      } else if (!res.ok) {
+        toast.error('فشل جلب البيانات: ' + (data.error || 'خطأ غير معروف'));
       } else {
-        toast.error('فشل جلب البيانات: ' + data.error);
+        console.error('Expected prompts array but got:', data);
+        setPrompts([]);
       }
     } catch (error) {
       toast.error('خطأ في الاتصال بالسيرفر');

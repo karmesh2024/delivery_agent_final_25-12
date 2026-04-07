@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { createClient } from '@supabase/supabase-js';
 
-const prisma = new PrismaClient();
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // GET: جلب سجلات التنفيذ
 export async function GET(req: NextRequest) {
@@ -10,13 +13,27 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status');
 
   try {
-    const logs = await (prisma as any).tool_execution_logs.findMany({
-      where: status ? { status } : {},
-      orderBy: { created_at: 'desc' },
-      take: limit
-    });
-    return NextResponse.json(logs);
+    let query = supabase
+      .from('tool_execution_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      // الجدول قد لا يكون موجوداً بعد — نُعيد مصفوفة فارغة بدلاً من خطأ
+      console.warn('tool_execution_logs fetch warning:', error.message);
+      return NextResponse.json([]);
+    }
+
+    return NextResponse.json(data ?? []);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Error fetching logs:', error);
+    return NextResponse.json([]);
   }
 }

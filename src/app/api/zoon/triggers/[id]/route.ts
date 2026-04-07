@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { createClient } from '@supabase/supabase-js';
 
-const prisma = new PrismaClient();
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // PATCH: تحديث مشغل
 export async function PATCH(
@@ -11,11 +14,15 @@ export async function PATCH(
   const { id } = params;
   try {
     const body = await req.json();
-    const updatedTrigger = await (prisma as any).scheduled_triggers.update({
-      where: { id },
-      data: body
-    });
-    return NextResponse.json(updatedTrigger);
+    const { data, error } = await supabase
+      .from('scheduled_triggers')
+      .update(body)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(data);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -28,9 +35,12 @@ export async function DELETE(
 ) {
   const { id } = params;
   try {
-    await (prisma as any).scheduled_triggers.delete({
-      where: { id }
-    });
+    const { error } = await supabase
+      .from('scheduled_triggers')
+      .delete()
+      .eq('id', id);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

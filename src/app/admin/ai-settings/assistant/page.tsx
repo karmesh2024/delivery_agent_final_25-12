@@ -6,7 +6,7 @@ import { Card } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FiCheck, FiX, FiRefreshCcw, 
@@ -44,7 +44,7 @@ const roomTranslations: Record<string, string> = {
 };
 
 export default function AssistantSettingsPage() {
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
   const [circles, setCircles] = useState<any[]>([]);
   const [queue, setQueue] = useState<any[]>([]);
   const [settings, setSettings] = useState<Record<string, any>>({});

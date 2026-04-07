@@ -4,9 +4,9 @@
 // التاريخ: 2026-02-18
 // ═══════════════════════════════════════════════════════════════
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 
-const supabase = createClientComponentClient();
+const supabase = createClient();
 
 // ═══════════════════════════════════════════════════════════════
 // الأنواع (Types)

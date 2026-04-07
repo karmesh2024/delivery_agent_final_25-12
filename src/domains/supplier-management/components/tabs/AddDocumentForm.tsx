@@ -16,7 +16,7 @@ import { PlusCircle, FileText, Calendar, AlertCircle, Upload } from 'lucide-reac
 import { useAppSelector } from '@/store/index';
 import { SupplierDocument, DocumentType } from '../../types';
 import { toast } from 'react-toastify';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 
 const RequiredIndicator = () => (
   <span className="text-red-500 mr-1">*</span>
@@ -42,7 +42,7 @@ const AddDocumentForm: React.FC<AddDocumentFormProps> = ({ supplierName, supplie
 
   console.log("Document Types from Redux:", documentTypes);
 
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
 
   const [newDocument, setNewDocument] = useState<Partial<SupplierDocument>>(() => ({
     document_type_id: undefined,

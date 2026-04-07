@@ -30,7 +30,12 @@ export default function ZoonLogViewer() {
       const url = `/api/zoon/logs?limit=100${filter !== 'all' ? `&status=${filter}` : ''}`;
       const res = await fetch(url);
       const data = await res.json();
-      if (res.ok) setLogs(data);
+      if (res.ok && Array.isArray(data)) {
+        setLogs(data);
+      } else if (!Array.isArray(data)) {
+        console.error('Expected logs array but got:', data);
+        setLogs([]);
+      }
     } catch (error) {
        console.error('Fetch logs error', error);
     } finally {

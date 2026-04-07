@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // PATCH: تفعيل نسخة محددة من البرومبت
 export async function PATCH(
@@ -9,19 +14,21 @@ export async function PATCH(
   const { id } = params;
 
   try {
-    // استخدام transaction لضمان أن نسخة واحدة فقط تكون مفعلة
-    await prisma.$transaction([
-      // 1. إلغاء تفعيل الجميع
-      prisma.system_prompts.updateMany({
-        where: { is_active: true },
-        data: { is_active: false }
-      }),
-      // 2. تفعيل النسخة المطلوبة
-      prisma.system_prompts.update({
-        where: { id },
-        data: { is_active: true }
-      })
-    ]);
+    // 1. إلغاء تفعيل جميع النسخ أولاً
+    const { error: deactivateError } = await supabase
+      .from('system_prompts')
+      .update({ is_active: false })
+      .eq('is_active', true);
+
+    if (deactivateError) throw deactivateError;
+
+    // 2. تفعيل النسخة المطلوبة
+    const { error: activateError } = await supabase
+      .from('system_prompts')
+      .update({ is_active: true })
+      .eq('id', id);
+
+    if (activateError) throw activateError;
 
     return NextResponse.json({ success: true, message: 'تم تفعيل النسخة بنجاح' });
   } catch (error: any) {

@@ -7,7 +7,7 @@ import { Card } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
 import { archetypeEngine, type ArchetypeName } from '@/domains/zoon-club/services/archetypeEngine.service';
 import { advancedPsychologicalEngine } from '@/domains/zoon-club/services/zoonAdvancedPsychologicalEngine.service';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 import { toast } from 'react-hot-toast';
 
 export interface EmotionalShieldProps {
@@ -16,14 +16,14 @@ export interface EmotionalShieldProps {
 }
 
 export function EmotionalShield({ onToneReady, onConsentChange }: EmotionalShieldProps) {
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showConsent, setShowConsent] = useState(false);
   const [archetype, setArchetype] = useState<ArchetypeName | null>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(({ data }: any) => {
       if (data?.user) {
         setUser(data.user);
       }

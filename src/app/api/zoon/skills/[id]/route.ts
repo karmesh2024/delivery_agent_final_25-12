@@ -1,16 +1,21 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // PUT: تحديث مهارة مع وظائفها
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const data = await req.json();
-    
-    // تحديث المهارة الأساسية
-    const updatedSkill = await prisma.ai_skills.update({
-      where: { id },
-      data: {
+
+    // 1. تحديث المهارة الأساسية
+    const { error: updateError } = await supabase
+      .from('ai_skills')
+      .update({
         name: data.name,
         description: data.description,
         type: data.type,
@@ -19,40 +24,55 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         is_active: data.is_active,
         category: data.category,
         icon: data.icon,
-        updated_at: new Date(),
-      },
-    });
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
 
-    // إذا تم إرسال وظائف، نقوم بحذف القديمة وإنشاء الجديدة (Replace Strategy)
+    if (updateError) {
+      console.error('Error updating AI skill:', updateError);
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    // 2. Replace strategy للوظائف: حذف القديمة وإنشاء الجديدة
     if (data.functions !== undefined) {
-      // حذف الوظائف القديمة
-      await prisma.ai_skill_functions.deleteMany({
-        where: { skill_id: id }
-      });
+      await supabase
+        .from('ai_skill_functions')
+        .delete()
+        .eq('skill_id', id);
 
-      // إنشاء الوظائف الجديدة
       if (data.functions && data.functions.length > 0) {
-        await prisma.ai_skill_functions.createMany({
-          data: data.functions.map((fn: any, idx: number) => ({
-            skill_id: id,
-            name: fn.name,
-            label: fn.label,
-            description: fn.description || '',
-            type: fn.type || 'internal',
-            endpoint: fn.endpoint || null,
-            input_schema: fn.input_schema || {},
-            is_active: fn.is_active ?? true,
-            sort_order: idx + 1,
-          }))
-        });
+        const functions = data.functions.map((fn: any, idx: number) => ({
+          skill_id: id,
+          name: fn.name,
+          label: fn.label,
+          description: fn.description || '',
+          type: fn.type || 'internal',
+          endpoint: fn.endpoint || null,
+          input_schema: fn.input_schema || {},
+          is_active: fn.is_active ?? true,
+          sort_order: idx + 1,
+        }));
+
+        const { error: fnError } = await supabase
+          .from('ai_skill_functions')
+          .insert(functions);
+
+        if (fnError) {
+          console.error('Error updating skill functions:', fnError);
+        }
       }
     }
 
-    // جلب المهارة المحدثة مع وظائفها
-    const result = await prisma.ai_skills.findUnique({
-      where: { id },
-      include: { ai_skill_functions: { orderBy: { sort_order: 'asc' } } }
-    });
+    // 3. جلب المهارة المحدثة مع وظائفها
+    const { data: result, error: fetchError } = await supabase
+      .from('ai_skills')
+      .select('*, ai_skill_functions(*)')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      return NextResponse.json({ error: fetchError.message }, { status: 500 });
+    }
 
     return NextResponse.json(result);
   } catch (error: any) {
@@ -65,10 +85,17 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    await prisma.ai_skills.delete({
-      where: { id }
-    });
-    
+
+    const { error } = await supabase
+      .from('ai_skills')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting AI skill:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
     return NextResponse.json({ success: true, message: 'Skill deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting AI skill:', error);

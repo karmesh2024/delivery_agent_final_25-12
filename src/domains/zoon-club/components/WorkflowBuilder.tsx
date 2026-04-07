@@ -27,7 +27,7 @@ import { Label } from '@/shared/ui/label';
 import { Badge } from '@/shared/ui/badge';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/shared/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 import { 
   FiPlay, FiSave, FiPlus, FiCpu, FiMessageCircle, FiImage, 
   FiSettings, FiExternalLink, FiRefreshCcw, FiCheckCircle, FiX, 
@@ -178,7 +178,7 @@ const defaultEdges: Edge[] = [
 // 🏗️ المكون الرئيسي
 // ==================================================
 function WorkflowBuilderInner({ onPostSaved }: { onPostSaved?: () => void }) {
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [nodes, setNodes] = useState<Node[]>(defaultNodes);

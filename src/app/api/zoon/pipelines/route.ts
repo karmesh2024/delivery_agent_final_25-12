@@ -1,19 +1,23 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { createClient } from '@supabase/supabase-js';
 import { savePipelineAsSkill } from '@/domains/zoon-os/functions/pipeline/pipeline-to-skill';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function GET() {
   try {
-    const pipelines = await (prisma as any).function_pipelines.findMany({
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        nodes: true
-      },
-      orderBy: { created_at: 'desc' }
-    });
-    return NextResponse.json(pipelines);
+    const { data, error } = await supabase
+      .from('function_pipelines')
+      .select('id, name, description, nodes')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json(data ?? []);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

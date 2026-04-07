@@ -1,17 +1,35 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // GET: جلب كل المهارات مع وظائفها
 export async function GET() {
   try {
-    const skills = await prisma.ai_skills.findMany({
-      orderBy: { created_at: 'desc' },
-      include: {
-        ai_skill_functions: {
-          orderBy: { sort_order: 'asc' }
-        }
-      }
-    });
+    const { data, error } = await supabase
+      .from('ai_skills')
+      .select(`
+        *,
+        ai_skill_functions (*)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching AI skills:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // ترتيب الوظائف حسب sort_order
+    const skills = (data ?? []).map((skill: any) => ({
+      ...skill,
+      ai_skill_functions: (skill.ai_skill_functions || []).sort(
+        (a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+      ),
+    }));
+
     return NextResponse.json(skills);
   } catch (error: any) {
     console.error('Error fetching AI skills:', error);
@@ -23,13 +41,15 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const data = await req.json();
-    
+
     if (!data.name || !data.description || !data.type) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const newSkill = await prisma.ai_skills.create({
-      data: {
+    // 1. إنشاء المهارة الأساسية
+    const { data: newSkill, error: skillError } = await supabase
+      .from('ai_skills')
+      .insert({
         name: data.name,
         description: data.description,
         type: data.type,
@@ -39,28 +59,46 @@ export async function POST(req: Request) {
         category: data.category || 'general',
         icon: data.icon || '⚡',
         source: data.source || 'code',
-        // إنشاء الوظائف التابعة إن وجدت
-        ...(data.functions && data.functions.length > 0 ? {
-          ai_skill_functions: {
-            create: data.functions.map((fn: any, idx: number) => ({
-              name: fn.name,
-              label: fn.label,
-              description: fn.description || '',
-              type: fn.type || 'internal',
-              endpoint: fn.endpoint || null,
-              input_schema: fn.input_schema || {},
-              is_active: fn.is_active ?? true,
-              sort_order: idx + 1,
-            }))
-          }
-        } : {})
-      },
-      include: {
-        ai_skill_functions: { orderBy: { sort_order: 'asc' } }
-      }
-    });
+      })
+      .select()
+      .single();
 
-    return NextResponse.json(newSkill, { status: 201 });
+    if (skillError) {
+      console.error('Error creating AI skill:', skillError);
+      return NextResponse.json({ error: skillError.message }, { status: 500 });
+    }
+
+    // 2. إنشاء الوظائف التابعة إن وجدت
+    if (data.functions && data.functions.length > 0) {
+      const functions = data.functions.map((fn: any, idx: number) => ({
+        skill_id: (newSkill as any).id,
+        name: fn.name,
+        label: fn.label,
+        description: fn.description || '',
+        type: fn.type || 'internal',
+        endpoint: fn.endpoint || null,
+        input_schema: fn.input_schema || {},
+        is_active: fn.is_active ?? true,
+        sort_order: idx + 1,
+      }));
+
+      const { error: fnError } = await supabase
+        .from('ai_skill_functions')
+        .insert(functions);
+
+      if (fnError) {
+        console.error('Error creating skill functions:', fnError);
+      }
+    }
+
+    // 3. جلب المهارة كاملة مع وظائفها
+    const { data: result } = await supabase
+      .from('ai_skills')
+      .select('*, ai_skill_functions(*)')
+      .eq('id', (newSkill as any).id)
+      .single();
+
+    return NextResponse.json(result, { status: 201 });
   } catch (error: any) {
     console.error('Error creating AI skill:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

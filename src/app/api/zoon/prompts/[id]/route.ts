@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // DELETE: حذف نسخة معينة من البرومبت
 export async function DELETE(
@@ -10,21 +15,31 @@ export async function DELETE(
 
   try {
     // التحقق من أن النسخة ليست مفعلة قبل الحذف
-    const prompt = await prisma.system_prompts.findUnique({
-      where: { id }
-    });
+    const { data: prompt, error: fetchError } = await supabase
+      .from('system_prompts')
+      .select('id, is_active')
+      .eq('id', id)
+      .single();
 
-    if (!prompt) {
+    if (fetchError || !prompt) {
       return NextResponse.json({ error: 'النسخة غير موجودة' }, { status: 404 });
     }
 
-    if (prompt.is_active) {
-      return NextResponse.json({ error: 'لا يمكن حذف النسخة المفعلة حالياً' }, { status: 400 });
+    if ((prompt as any).is_active) {
+      return NextResponse.json(
+        { error: 'لا يمكن حذف النسخة المفعلة حالياً' },
+        { status: 400 }
+      );
     }
 
-    await prisma.system_prompts.delete({
-      where: { id }
-    });
+    const { error } = await supabase
+      .from('system_prompts')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true, message: 'تم حذف النسخة بنجاح' });
   } catch (error: any) {

@@ -46,7 +46,12 @@ export default function ZoonTriggerManager() {
       setLoading(true);
       const res = await fetch('/api/zoon/triggers');
       const data = await res.json();
-      setTriggers(data);
+      if (Array.isArray(data)) {
+        setTriggers(data);
+      } else {
+        console.error('Expected triggers array but got:', data);
+        setTriggers([]);
+      }
     } catch (error) {
       toast.error('فشل جلب المشغلات');
     } finally {
