@@ -56,6 +56,12 @@ Handlers):
 3. **المكتشف الاستباقي (Pulse Engine):** مسار `/api/zoon/discovery/pulse` الذي
    يجري عمليات استشكاف صامتة في الخلفية.
 
+### 2.3. نظام البرومبت السيادي (Sovereign Prompt Manager)
+تم عزل الـ System Prompt عن الكود المصدري وربطه بقاعدة بيانات (Supabase)، مما يسمح بـ:
+- **التعديل الفوري:** تغيير سلوك العقل المدبر دون الحاجة لإعادة التشغيل أو الـ Build.
+- **إدارة الإصدارات (Versioning):** الاحتفاظ بسجل تاريخي لكل تعديل على شخصية الوكيل.
+- **تخصيص الأدوات:** مزامنة تعريفات الأدوات (Tool Definitions) مع الـ Logic الداخلي بمرونة عالية.
+
 ---
 
 ## 🛠️ 3. التحليلات التقنية المنفذة (Verified Workflows)
@@ -79,11 +85,11 @@ Handlers):
 
 ### 3.3. البحث المتعدد (Multi-Source Discovery)
 
-- **News Logic:** سحب الأخبار وتنسيقها في بطاقات (UI Cards).
-- **Gallery Mode:** عرض نتائج البحث عن الصور بشكل احترافي مع تحليل محتواها
-  بصرياً.
-- **Scraping:** استخدام تكنولوجيا `Firecrawl` و `Puppeteer` لقراءة المواقع
-  المحمية.
+- **محرك هجين (Hybrid Search):** دمج `SearXNG` كمحرك محلي سيادي مع `DuckDuckGo` كخيار طوارئ، لضمان استقرار النتائج وتجاوز الحظر.
+- **البحث البصري مع الـ OCR التكيفي:** 
+  - عرض نتائج الصور في `Gallery Mode` مع تحويل الروابط الخارجية إلى `Base64` لتجاوز قيود عرض الصور.
+  - تنفيذ OCR هجين (Gemini 2.0/1.5 Fallback) لاستخراج النصوص من الصور بدقة عالية وحل مشكلات الـ Quota آلياً.
+- **Scraping:** استخدام تكنولوجيا `Firecrawl` و `Puppeteer` لقراءة المواقع المحمية.
 
 ---
 
@@ -92,9 +98,9 @@ Handlers):
 | الميزة                   | الحالة   | الموقع البرمجي                                |
 | :----------------------- | :------- | :-------------------------------------------- |
 | **Model Fallback Chain** | ✅ مستقر | `src/app/api/zoon/route.ts`                   |
-| **Sovereign File Tool**  | ✅ فعال  | `zoon-os/functions/handlers/file-handlers.ts` |
-| **Proactive Pulse**      | ✅ يعمل  | `src/app/api/zoon/discovery/pulse/route.ts`   |
-| **HITL Edit Support**    | ✅ متوفر | `src/domains/zoon-os/components/ZoonChat.tsx` |
+| **Hybrid Search Engine** | ✅ فعال  | `zoon-os/functions/handlers/search-handlers.ts`|
+| **Prompt Management UI** | ✅ جديد  | `zoon-os/components/ZoonPromptManager.tsx`     |
+| **Visual OCR Fallback**  | ✅ مؤمن  | `api/zoon/analyze/route.ts`                   |
 | **Security Wrapper**     | ✅ مؤمن  | `lib/executeToolSafely.ts`                    |
 
 ---

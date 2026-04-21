@@ -248,7 +248,7 @@ export default function ZoonChat() {
       
       const result = await response.json();
       if (result.success) {
-        setImageAnalysis(prev => ({ ...prev, [imageUrl]: result.data.text }));
+        setImageAnalysis(prev => ({ ...prev, [imageUrl]: result.data.extractedText || result.data.text || 'لايوجد نص مقروء' }));
       } else {
         setImageAnalysis(prev => ({ ...prev, [imageUrl]: '⚠️ تعذر التحليل حالياً.' }));
       }
@@ -427,9 +427,16 @@ export default function ZoonChat() {
                       {message.role === 'user' && <span className="font-bold block mb-1">👤 أنت: </span>}
                       <ReactMarkdown
                         components={{
-                          img: ({ src, ...props }) => {
+                          img: ({ src, alt, ...props }) => {
                             if (!src) return null;
-                            return <img src={src} {...props} />;
+                            return <img 
+                              src={src} 
+                              alt={alt || "صورة توضيحية"} 
+                              {...props} 
+                              className="max-h-[300px] w-auto inline-block rounded-xl shadow-md border border-gray-200 mt-2 object-contain bg-gray-50"
+                              onError={(e: any) => e.target.style.display='none'}
+                              loading="lazy"
+                            />;
                           },
                           a: ({ href, children }) => {
                             if (!href) return null;
@@ -440,20 +447,20 @@ export default function ZoonChat() {
                             const safeHostname = url.startsWith('http') ? new URL(url).hostname : 'رابط خارجي';
                             
                             return (
-                              <div className="my-2 p-3 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow flex items-center gap-3">
-                                <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+                              <span className="my-2 p-3 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow flex items-center gap-3 min-w-0" style={{ display: 'flex' }}>
+                                <span className="p-2 bg-blue-50 rounded-lg text-blue-600 flex-shrink-0">
                                   <img 
                                     src={`https://www.google.com/s2/favicons?domain=${safeHostname}&sz=32`} 
                                     alt="" 
-                                    className="w-5 h-5"
+                                    className="w-5 h-5 block"
                                     onError={(e: any) => e.target.src = 'https://www.google.com/favicon.ico'}
                                   />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-[10px] text-gray-400 font-bold uppercase truncate">{safeHostname}</div>
-                                  <h5 className="text-[13px] font-bold text-gray-900 truncate leading-tight">{title}</h5>
-                                </div>
-                                <div className="flex gap-1.5">
+                                </span>
+                                <span className="flex-1 min-w-0 overflow-hidden text-right block">
+                                  <span className="block text-[10px] text-gray-400 font-bold uppercase truncate w-full">{safeHostname}</span>
+                                  <span className="block text-[13px] font-bold text-gray-900 truncate leading-tight w-full mt-0.5">{title}</span>
+                                </span>
+                                <span className="flex items-center gap-1.5 flex-shrink-0">
                                   <a 
                                     href={url} 
                                     target="_blank" 
@@ -476,8 +483,8 @@ export default function ZoonChat() {
                                   >
                                     {isInBank ? '❌' : '📥 حفظ'}
                                   </button>
-                                </div>
-                              </div>
+                                </span>
+                              </span>
                             );
                           }
                         }}
@@ -548,17 +555,18 @@ export default function ZoonChat() {
                           {part.output.category === 'images' ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                               {part.output.results?.map((res: any, i: number) => {
-                                const analysis = imageAnalysis[res.fullImage || res.url];
-                                const loading = isAnalyzing[res.fullImage || res.url];
+                                const analysisId = res.imageUrl || res.fullImage || res.url;
+                                const analysis = imageAnalysis[analysisId];
+                                const loading = isAnalyzing[analysisId];
                                 
                                 return (
                                   <div key={i} className="flex flex-col bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden group">
                                     <div className="relative aspect-video overflow-hidden">
-                                      {(res.thumbnail || res.img_src) ? (
+                                      {(res.imageUrl || res.thumbnail || res.img_src) ? (
                                         <img 
-                                          src={res.thumbnail || res.img_src} 
-                                          alt={res.title} 
-                                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                                          src={res.imageUrl || res.thumbnail || res.img_src} 
+                                          alt={res.title || 'صورة'} 
+                                          className="w-full h-full object-contain bg-black/5 group-hover:scale-105 transition-transform duration-700"
                                           onError={(e: any) => e.target.src = 'https://via.placeholder.com/300?text=No+Image'}
                                         />
                                       ) : (
@@ -570,7 +578,7 @@ export default function ZoonChat() {
                                           🔗
                                         </a>
                                         <button 
-                                          onClick={() => handleAnalyzeImage(res.fullImage || res.url, res.title)}
+                                          onClick={() => handleAnalyzeImage(analysisId, res.title)}
                                           className="px-3 py-1.5 bg-white text-blue-600 rounded-full text-[10px] font-bold shadow-lg hover:bg-blue-50 transition-all"
                                           disabled={loading}
                                         >

@@ -31,6 +31,7 @@ import ZoonTriggerManager from '@/domains/zoon-os/components/ZoonTriggerManager'
 import ZoonPromptManager from '@/domains/zoon-os/components/ZoonPromptManager';
 import ZoonLogViewer from '@/domains/zoon-os/components/ZoonLogViewer';
 import ZoonChat from '@/domains/zoon-os/components/ZoonChat';
+import ZoonKnowledgeGraph from '@/domains/zoon-os/components/ZoonKnowledgeGraph';
 
 const roomTranslations: Record<string, string> = {
   'home': 'بيوتنا',
@@ -261,6 +262,9 @@ export default function AssistantSettingsPage() {
             <TabsTrigger value="logs" className="data-[state=active]:bg-white data-[state=active]:text-slate-700 font-black px-6 py-2.5">
               <FiList className="ml-2" /> سجلات التنفيذ
             </TabsTrigger>
+            <TabsTrigger value="palace" className="data-[state=active]:bg-white data-[state=active]:text-emerald-600 font-black px-6 py-2.5">
+               🏰 قصر الذاكرة
+            </TabsTrigger>
             <TabsTrigger value="copilot" className="data-[state=active]:bg-white data-[state=active]:text-green-600 font-black px-6 py-2.5">
                🤖 المساعد الذكي
             </TabsTrigger>
@@ -366,6 +370,13 @@ export default function AssistantSettingsPage() {
           <TabsContent value="copilot">
             <div className="h-[600px] border rounded-3xl overflow-hidden shadow-2xl mt-4 bg-white">
               <ZoonChat />
+            </div>
+          </TabsContent>
+
+          {/* 🏰 Memory Palace Tab */}
+          <TabsContent value="palace">
+            <div className="mt-4">
+              <ZoonKnowledgeGraph />
             </div>
           </TabsContent>
         </Tabs>

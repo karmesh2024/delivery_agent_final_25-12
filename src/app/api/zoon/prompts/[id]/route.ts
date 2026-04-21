@@ -47,3 +47,34 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+// PUT: تعديل محتوى نسخة معينة من البرومبت
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const { id } = params;
+
+  try {
+    const body = await req.json();
+    const { content, note } = body;
+
+    if (!content) {
+      return NextResponse.json({ error: 'المحتوى مطلوب' }, { status: 400 });
+    }
+
+    const { error } = await supabase
+      .from('system_prompts')
+      .update({ content, note })
+      .eq('id', id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, message: 'تم تحديث النسخة بنجاح' });
+  } catch (error: any) {
+    console.error('Error updating prompt:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

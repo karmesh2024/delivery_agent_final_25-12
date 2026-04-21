@@ -41,31 +41,88 @@ export async function webSearchHandler(params: {
       return { success: false, summary: 'يجب توفير نص البحث', error: 'Missing query' };
     }
 
-    // استخدام DuckDuckGo عبر duck-duck-scrape
-    const searchResults = await search(query, {
-      safeSearch: SafeSearchType.MODERATE,
-    });
+    let results: SearchResultItem[] = [];
+    let isSearXNG = false;
+    
+    // 1. محاولة استخدام محرك SearXNG الداخلي إذا كان مأهولاً في ملفات البيئة
+    const searxngUrl = process.env.SEARXNG_URL;
+    if (searxngUrl) {
+      try {
+        const baseUrl = searxngUrl.endsWith('/') ? searxngUrl.slice(0, -1) : searxngUrl;
+        const searxngCategory = category === 'images' ? 'images' : 'general';
+        
+        const searchUrl = new URL(`${baseUrl}/search`);
+        searchUrl.searchParams.set('q', query);
+        searchUrl.searchParams.set('format', 'json');
+        searchUrl.searchParams.set('categories', searxngCategory);
+        searchUrl.searchParams.set('language', 'ar-EG');
+        
+        const res = await fetch(searchUrl.toString(), {
+          signal: AbortSignal.timeout(10000), // مهلة 10 ثوانٍ للسماح باستجابة محركات متعددة
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          results = (data.results || [])
+            .slice(0, effectiveLimit)
+            .map((r: any) => {
+              const itemUrl = r.url || r.img_src || 'https://unknown.com';
+              return {
+                title: r.title || '',
+                url: itemUrl !== 'https://unknown.com' ? itemUrl : '',
+                snippet: r.content || r.snippet || '',
+                source: new URL(itemUrl).hostname,
+                ...(category === 'images' && { imageUrl: r.img_src || r.thumbnail_src || itemUrl }),
+              };
+            });
+          
+          if (results.length > 0) isSearXNG = true;
+        }
+      } catch (err: any) {
+        console.warn(`[webSearchHandler] SearXNG unavailable, falling back to DDG: ${err.message}`);
+      }
+    }
 
-    const results: SearchResultItem[] = (searchResults.results || [])
-      .slice(0, effectiveLimit)
-      .map((r: any) => ({
-        title: r.title || '',
-        url: r.url || r.href || '',
-        snippet: r.description || r.body || '',
-        source: new URL(r.url || r.href || 'https://unknown.com').hostname,
-      }));
+    // 2. استخدام مكتبة duck-duck-scrape كخيار طوارئ (Fallback) إذا فشل SearXNG أو غير متوفر
+    if (!isSearXNG) {
+      const searchResults = await search(query, {
+        safeSearch: SafeSearchType.MODERATE,
+      });
+
+      results = (searchResults.results || [])
+        .slice(0, effectiveLimit)
+        .map((r: any) => {
+          const itemUrl = r.url || r.href || 'https://unknown.com';
+          return {
+            title: r.title || '',
+            url: itemUrl !== 'https://unknown.com' ? itemUrl : '',
+            snippet: r.description || r.body || '',
+            source: new URL(itemUrl).hostname,
+            ...(category === 'images' && { imageUrl: r.image || r.thumbnail || r.url }),
+          };
+        });
+    }
 
     return {
       success: true,
-      data: { results, count: results.length, query, category },
+      data: { type: 'search_results', results, count: results.length, query, category, engine: isSearXNG ? 'SearXNG' : 'DuckDuckGo' },
       summary: `🔍 تم العثور على ${results.length} نتيجة لـ "${query}"`,
     };
   } catch (error: any) {
     console.error('[webSearchHandler] Error:', error.message);
+    const aiNotice = 'الرجاء الرد حالاً واعتذر للمستخدم لأن محرك البحث محظور مؤقتا بسبب الضغط الزائد، قدم معلومات تقريبية من ذاكرتك واسأله إذا كان يريد الاستمرار بإجراء آخر.';
     return {
       success: false,
-      summary: `فشل البحث: ${error.message}`,
-      error: error.message,
+      data: { 
+        type: 'search_results',
+        results: [], 
+        count: 0, 
+        query: params.query, 
+        category: params.category || 'general',
+        error_alert_for_ai: aiNotice
+      },
+      summary: `تعذر إتمام البحث لأن محرك البحث حظر الطلب مؤقتاً.`,
+      error: aiNotice,
     };
   }
 }
@@ -226,29 +283,52 @@ export async function imageOCRHandler(params: {
       return { success: false, summary: 'لم يتم تكوين مفتاح Gemini API', error: 'Missing API key' };
     }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              { inline_data: { mime_type: 'image/jpeg', data: '' } },
-              { file_data: { mime_type: 'image/jpeg', file_uri: imageUrl } },
-            ].filter(p => !('inline_data' in p)), // استخدم file_uri فقط
-          }],
-        }),
-      }
-    );
+    // جلب الصورة وتحويلها إلى Base64
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+        throw new Error('فشل جلب الصورة من الرابط المصدر');
+    }
+    const arrayBuffer = await imageResponse.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const base64Data = buffer.toString('base64');
+    let mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+    
+    // بعض الخوادم ترد بنوع بيانات عام فنضمن تعريفه كصورة
+    if (!mimeType.startsWith('image/')) mimeType = 'image/jpeg';
+
+    const tryOCR = async (modelName: string) => {
+      return await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: prompt },
+                { inlineData: { mimeType: mimeType, data: base64Data } },
+              ]
+            }],
+          }),
+        }
+      );
+    };
+
+    let response = await tryOCR('gemini-2.0-flash');
+
+    // إذا نفدت الحصة (429) أو الموديل غير موجود (404)، جرب الموديل البديل 1.5-flash
+    if (response.status === 429 || response.status === 404) {
+      console.warn(`[imageOCRHandler] Model fallback triggered due to ${response.status}`);
+      response = await tryOCR('gemini-1.5-flash');
+    }
 
     if (!response.ok) {
-      // Fallback: إرجاع رابط الصورة فقط
+      const errText = await response.text();
+      console.error('[imageOCRHandler] Gemini API Final Rejection:', errText);
       return {
         success: true,
-        data: { extractedText: `[صورة]: ${imageUrl}`, imageUrl },
-        summary: `🖼️ تم تلقي الصورة. لا يمكن استخراج نص حالياً.`,
+        data: { extractedText: `[عذرًا، حدود الاستخدام المجانية نفدت حالياً. جرب بعد دقيقة.] \n تفاصيل: ${response.status}`, imageUrl },
+        summary: `🖼️ تعذر التحليل بسبب حدود الاستخدام (Rate Limit).`,
       };
     }
 

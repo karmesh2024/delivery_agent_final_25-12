@@ -27,6 +27,8 @@ export default function ZoonPromptManager() {
   const [isAdding, setIsAdding] = useState(false);
   const [newContent, setNewContent] = useState('');
   const [newNote, setNewNote] = useState('');
+  const [editingPromptId, setEditingPromptId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
 
   // جلب البيانات
   const fetchPrompts = async () => {
@@ -83,6 +85,27 @@ export default function ZoonPromptManager() {
         fetchPrompts();
       } else {
         toast.error('فشل الحذف: ' + data.error);
+      }
+    } catch (error) {
+      toast.error('خطأ في الاتصال');
+    }
+  };
+
+  // تعديل نسخة
+  const updatePrompt = async (id: string) => {
+    try {
+      const res = await fetch(`/api/zoon/prompts/${id}`, { 
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: editingContent, note: prompts.find(p => p.id === id)?.note })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('تم حفظ التعديلات بنجاح');
+        setEditingPromptId(null);
+        fetchPrompts();
+      } else {
+        toast.error('فشل التحديث: ' + data.error);
       }
     } catch (error) {
       toast.error('خطأ في الاتصال');
@@ -222,7 +245,7 @@ export default function ZoonPromptManager() {
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-2">
-                      <Dialog>
+                      <Dialog onOpenChange={(open) => { if (!open) setEditingPromptId(null); }}>
                         <DialogTrigger asChild>
                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-indigo-600">
                             <FiFileText size={16} />
@@ -239,14 +262,32 @@ export default function ZoonPromptManager() {
                               )}
                             </DialogTitle>
                           </DialogHeader>
-                          <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 font-mono text-sm leading-relaxed whitespace-pre-wrap text-slate-700 select-all">
-                            {p.content}
+                          <div className={editingPromptId === p.id ? "mt-4" : "bg-slate-50 p-6 rounded-xl border border-slate-200 font-mono text-sm leading-relaxed whitespace-pre-wrap text-slate-700 select-all"}>
+                            {editingPromptId === p.id ? (
+                              <Textarea 
+                                className="min-h-[400px] font-mono text-sm leading-relaxed text-right border-indigo-200 focus-visible:ring-indigo-500 shadow-sm"
+                                value={editingContent}
+                                onChange={(e) => setEditingContent(e.target.value)}
+                                dir="rtl"
+                              />
+                            ) : (
+                              p.content
+                            )}
                           </div>
-                          <DialogFooter>
-                              {!p.is_active && (
-                                <Button onClick={() => activatePrompt(p.id)} className="bg-indigo-600 hover:bg-indigo-700">تفعيل هذه النسخة فوراً</Button>
+                          <DialogFooter className="mt-4 gap-2">
+                              {editingPromptId === p.id ? (
+                                <>
+                                  <Button onClick={() => updatePrompt(p.id)} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm gap-2 font-bold"><FiCheck /> حفظ التعديلات</Button>
+                                  <Button variant="outline" onClick={() => setEditingPromptId(null)}>إلغاء التعديل</Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button variant="outline" onClick={() => { setEditingContent(p.content); setEditingPromptId(p.id); }} className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 gap-2 font-bold"><FiFileText /> تعديل النص</Button>
+                                  {!p.is_active && (
+                                    <Button onClick={() => activatePrompt(p.id)} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 font-bold"><FiCheck /> تفعيل فوراً</Button>
+                                  )}
+                                </>
                               )}
-                              <Button variant="outline" onClick={() => {}}>إغلاق</Button>
                           </DialogFooter>
                         </DialogContent>
                       </Dialog>

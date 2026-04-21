@@ -15,7 +15,7 @@ export interface WebhookPayload {
   timestamp: string;
 }
 
-const prisma = new PrismaClient();
+import prisma from '@/lib/db';
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
 });

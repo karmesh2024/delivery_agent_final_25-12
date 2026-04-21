@@ -15,11 +15,13 @@ const saveMemorySchema = z.object({
 export const memoryTool = tool({
   description: 'احفظ معلومة هامة أخبرك بها المستخدم (مثل اسمه، طريقة رد معينة، أو مهام مؤجلة) لتتذكرها وتستخدمها للرد عليه في المحادثات القادمة.',
   inputSchema: saveMemorySchema,
-  execute: async (input: any) => {
+  execute: async (input: any, context?: { userId?: string; toolCallId?: string; messages?: any[] }) => {
     try {
-      // ⚠️ في مشروع حقيقي يتم جلب الـ UserId من الـ Middleware / Token
-      // هنا سنستخدم معرف افتراضي (admin) نظراً لعدم توفر نظام Auth متصل بالمحادثة حالياً
-      const USER_ID = 'admin-user-id'; 
+      const USER_ID = context?.userId || input.userId;
+      if (!USER_ID || USER_ID === 'admin-user-id') {
+        console.error('[memoryTool] userId missing — memory not saved');
+        return { status: 'error', message: 'لم يتم تحديد هوية المستخدم لحفظ الذاكرة' };
+      }
 
       const savedMemory = await MemoryManager.saveMemory(
         USER_ID, 

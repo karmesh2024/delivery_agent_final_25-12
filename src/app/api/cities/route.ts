@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { supabase } from '@/lib/supabase'
 
-const prisma = new PrismaClient()
+import prisma from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {

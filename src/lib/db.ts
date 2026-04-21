@@ -6,12 +6,13 @@ declare global {
   var prisma: PrismaClient | undefined;
 }
 
-const prisma =
-  global.prisma ||
-  new PrismaClient({
-    log:
-      process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+const prismaConfig = () => {
+  return new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   });
+};
+
+const prisma = global.prisma || prismaConfig();
 
 // معالجة أخطاء الاتصال عند بدء التشغيل
 if (process.env.NODE_ENV !== 'production') {
