@@ -215,84 +215,74 @@ ${memoryContext}
 - الأسماء (لمار وريتال) هم بنات ممدوح. أجب بـ: "بناتك هم لمار وريتال".
 - توقف عن استخدام ضمير المتكلم للأشياء التي تخص ممدوح. أجب دائماً بالعربية الرصينة.`;
 
-    // 2️⃣ اختيار المحرك (Chain Logic) - الأولوية للمحلي في بيئة الاختبار
-    // نعتبر أي رسالة قد تحتاج قوة إذا كان هناك أدوات نشطة غير الذاكرة
-    const needsPower = Object.keys(filteredTools).length > 1;
-    const MODEL_CHAIN = needsPower 
-      ? ['ollama:qwen2.5:7b', 'gemini-2.5-flash'] 
-      : ['ollama:qwen2.5:7b', 'gemini-2.5-flash']; 
+    // 2️⃣ اختيار المحرك بشكل آمن عبر التحقق المسبق (Pre-flight Model Check)
+    let aiEngine: any = googleProvider('gemini-2.5-flash'); 
+    let finalModelName = 'gemini-2.5-flash';
 
-    // الاختيار: إذا كان المستخدم في فريق، الرؤى تُعتبر رؤى فريق (Hybrid)
-    const currentScope: 'personal' | 'team' = TEAM_ID ? 'team' : 'personal';
-
-    let lastError: any = null;
-    for (const modelName of MODEL_CHAIN) {
-      try {
-        const isOllama = modelName.startsWith('ollama:');
-        const provider = isOllama ? ollamaProvider : googleProvider;
-        const actualModel = isOllama ? modelName.replace('ollama:', '') : modelName;
-
-        const result = streamText({
-          model: provider(actualModel),
-          messages: modelMessages,
-          system: systemPrompt,
-          tools: filteredTools,
-          toolChoice: 'auto',
-          maxSteps: 5,
-          onFinish: async ({ text, usage }: { text: string; usage: any }) => {
-            if (!text) return;
-            console.log(`✅ [AI Chain] ${modelName} finished.`);
-            
-            // تنفيذ العمليات الخلفية بدون تعطيل الرد
-            setImmediate(async () => {
-              try {
-                const summary = await summarizeConversation([...messages, { role: 'assistant', content: text }]);
-                const targetCtx = { wing: targetContext.wing || 'GENERAL', room: targetContext.room || 'HISTORY' };
-                
-                const thoughtChain = {
-                  timestamp: new Date().toISOString(),
-                  query: lastUserMessage,
-                  wing: targetCtx.wing,
-                  room: targetCtx.room,
-                  modelUsed: modelName,
-                  scope: currentScope,
-                  memoriesUsed: [], // IDs are merged in the formatted string, not tracked separately yet
-                  response_summary: text?.slice(0, 300) ?? null,
-                  was_answered: typeof text === 'string' && text.length > 20,
-                  memories_count: wakeUpFacts ? wakeUpFacts.split('\\n').filter(l => l.includes('•')).length : 0,
-                  query_category: categorizeQuery(lastUserMessage)
-                };
-
-                await autoSaveInsights(USER_ID, summary, targetCtx, TEAM_ID, currentScope, thoughtChain);
-                await extractAndSaveGraphRelations(USER_ID, [...messages, { role: 'assistant', content: text }], TEAM_ID, currentScope);
-                await logAgentAction({
-                  userId: USER_ID,
-                  actionType: 'decision',
-                  input: { query: lastUserMessage },
-                  output: { summary },
-                  thoughtChain,
-                  modelUsed: modelName,
-                  tokensUsed: usage?.totalTokens
-                });
-              } catch (e) {
-                console.error('❌ [Background Error]:', e);
-              }
-            });
-          }
-        } as any);
-
-        const responseData = result.toUIMessageStreamResponse();
-        responseData.headers.set('x-zoon-model', modelName);
-        return responseData;
-
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`⚠️ [AI Chain] Skip ${modelName}: ${err.message}`);
-        continue; 
+    try {
+      // نتحقق مما إذا كان خادم Ollama يعمل ويمتلك الموديل لتفادي انقطاع الـ Stream
+      const ollamaCheck = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(1500) });
+      const ollamaData = await ollamaCheck.json();
+      
+      const targetLocalModel = 'qwen2.5:7b';
+      if (ollamaData?.models?.some((m: any) => m.name === targetLocalModel || m.name.startsWith(targetLocalModel))) {
+        aiEngine = ollamaProvider(targetLocalModel);
+        finalModelName = targetLocalModel;
       }
+    } catch (e) {
+      console.log('⚠️ [AI Engine] Ollama not available or missing model, gracefully defaulting to Gemini.');
     }
 
-    throw lastError || new Error('All AI engines failed.');
+    const currentScope: 'personal' | 'team' = TEAM_ID ? 'team' : 'personal';
+
+    try {
+      const result = streamText({
+        model: aiEngine,
+        messages: modelMessages,
+        system: systemPrompt,
+        tools: filteredTools,
+        toolChoice: 'auto',
+        maxSteps: 5,
+        onFinish: async ({ text, usage }: { text: string; usage: any }) => {
+          if (!text) return;
+          console.log(`✅ [AI Chain] Stream finished successfully.`);
+          
+          setImmediate(async () => {
+            try {
+              const summary = await summarizeConversation([...messages, { role: 'assistant', content: text }]);
+              const targetCtx = { wing: targetContext.wing || 'GENERAL', room: targetContext.room || 'HISTORY' };
+              
+              const modelName = usage?.model ?? finalModelName;
+              const thoughtChain = {
+                timestamp: new Date().toISOString(),
+                query: lastUserMessage,
+                wing: targetCtx.wing,
+                room: targetCtx.room,
+                modelUsed: finalModelName,
+                scope: currentScope,
+                memoriesUsed: [], 
+                response_summary: text?.slice(0, 300) ?? null,
+                was_answered: typeof text === 'string' && text.length > 20,
+                memories_count: wakeUpFacts ? wakeUpFacts.split('\\n').filter(l => l.includes('•')).length : 0,
+                query_category: categorizeQuery(lastUserMessage)
+              };
+
+              await autoSaveInsights(USER_ID, summary, targetCtx, TEAM_ID, currentScope, thoughtChain);
+            } catch (e: any) {
+              console.error('❌ [Background Error]:', e.message);
+            }
+          });
+        }
+      });
+
+      const responseData = result.toUIMessageStreamResponse();
+      responseData.headers.set('x-zoon-model', 'hybrid-fallback');
+      return responseData;
+      
+    } catch (err: any) {
+      console.error(`❌ [AI Chain] Fatal error:`, err.message);
+      throw new Error(`All AI engines failed: ${err.message}`);
+    }
   } catch (error: any) {
     console.error('❌ Zoon API Error:', error);
     return new Response(JSON.stringify({ error: error?.message }), { status: 500 });
