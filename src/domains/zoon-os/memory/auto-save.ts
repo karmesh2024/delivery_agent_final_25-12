@@ -161,7 +161,8 @@ ${textToSummarize}`;
     summary = text;
 
     // Reject if significantly longer than the original (indicates hallucination)
-    if (summary.length > textToSummarize.length * 2) {
+    // Relaxed threshold: only reject if it's vastly longer (e.g., 4x) or exceeds a reasonable absolute limit
+    if (summary.length > textToSummarize.length * 4 && summary.length > 500) {
         console.warn('⚠️ [AutoSave] Insight length too long, likely hallucination. Rejecting.');
         return 'محادثة عامة (تم رفض التلخيص)';
     }
@@ -171,9 +172,9 @@ ${textToSummarize}`;
     // Fallback to Ollama if Gemini completely fails (and user has local Ollama setup)
     if (process.env.OLLAMA_URL || process.env.OLLAMA_BASE_URL) {
       try {
-        console.log('🔄 [AutoSave] Attempting Ollama 7B fallback for summarization...');
+        console.log('🔄 [AutoSave] Attempting Ollama qwen3.5:4b fallback for summarization...');
         const { text } = await generateText({ 
-          model: ollamaProvider('qwen2.5:7b'), 
+          model: ollamaProvider('qwen3.5:4b'), 
           prompt: summaryPrompt,
           temperature: 0.1
         });
@@ -291,7 +292,7 @@ export async function extractAndSaveGraphRelations(
     const chatHistory = messages.slice(-4).map(m => `${m.role}: ${m.content}`).join('\n');
     
     const { text } = await generateText({
-      model: ollamaProvider('qwen3:1.7b'),
+      model: ollamaProvider('qwen3.5:4b'),
       prompt: `استخرج العلاقات بصيغة JSON: [{"subject": "...", "predicate": "...", "object": "..."}]
 المحادثة: ${chatHistory}`
     });

@@ -10,7 +10,7 @@ const supabase = createClient(
  * 👁️‍🗨️ الاستباقية: تستدعى هذه الدالة قبل بدء المحادثة مع النظام،
  * لترى إذا ما كان لدى المستخدم عادات أو أسئلة מתكررة في مثل هذا اليوم من الأسبوع.
  */
-export async function getProactiveContext(userId: string): Promise<string | null> {
+export async function getProactiveContext(userId: string): Promise<string> {
   const todayDate = new Date();
   const currentDay = todayDate.getDay(); // 0 = الأحد, 4 = الخميس, 5 = الجمعة
   
@@ -25,5 +25,5 @@ export async function getProactiveContext(userId: string): Promise<string | null
     return `💡 [معلومة استباقية من الذاكرة العرضية]: المستخدم يسأل عادة عن "${todayPattern.query}" في يوم ${days[currentDay]}. إذا كانت هناك بيانات متاحة، تطوع بطرحها فوراً.`;
   }
   
-  return null;
+  return '';
 }

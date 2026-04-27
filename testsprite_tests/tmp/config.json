@@ -1,7 +1,20 @@
 {
-  "status": "init",
-  "scope": "codebase",
+  "status": "commited",
   "type": "backend",
-  "localEndpoint": "http://localhost:3000/",
-  "serverPort": 54266
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:3000",
+  "backendAuthType": "Bearer token",
+  "backendCredential": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5dGpndWlqcGJhaHJsdHFqZGtzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxOTc2NTE3NiwiZXhwIjoyMDM1MzQxMTc2fQ.sV2yTSWF9J73YpfIAYAFM0lZJrL_R7MMDQtcbOB3bfY",
+  "executionArgs": {
+    "projectName": "delivery_agent_final_25-12",
+    "projectPath": "d:\\karmesh_githup\\بيكب بتاريخ 4-7\\delivery-agent-dashboard\\delivery_agent_final_25-12",
+    "testIds": [],
+    "additionalInstruction": "Check TC001 (Login), TC004 (Redirect), TC006 (Agents API), and TC007 (Orders API). Ensure these pass now.",
+    "serverMode": "development",
+    "envs": {
+      "API_KEY": "sk-user-4uh3tcW4xOZBTFBVR2vm02t68L6Z7Rdaw12QpPrTKU78uKjFHFWC0o0SPsorf8v63VsBNno4zvWx1rzNjBQ0pnn8pvtZiLQrZVdiARpSJkI7BhmAHahVPTiS-ZdkmGyHycw"
+    }
+  },
+  "serverPort": 57687,
+  "proxy": "http://49369854-c20f-43a7-b8a3-0fc8cb780bd0:FLt076mHObcg4X9km7RMSSYnuID0QYvL@tun.testsprite.com:8080"
 }

@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 
 import prisma from '@/lib/db';
 
-export type MemoryType = 'preference' | 'task' | 'conversation';
+export type MemoryType = 'preference' | 'task' | 'conversation' | 'FACT' | 'INSIGHT';
 
 export interface MemoryItem {
   id?: string;
@@ -26,9 +26,9 @@ export const MemoryManager = {
       const memory = await (prisma as any).agent_memory.create({
         data: {
           user_id: userId,
-          memory_type: type,
-          content,
-          tags,
+          memory_type: type || 'conversation', // ضمان وجود قيمة للموديل
+          content: content || '',
+          tags: tags || [],
           is_active: true
         }
       });

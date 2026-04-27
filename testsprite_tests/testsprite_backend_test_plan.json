@@ -1,0 +1,52 @@
+[
+  {
+    "id": "TC001",
+    "title": "post login with valid and invalid credentials",
+    "description": "Test the POST /login endpoint with valid email and password to receive a 200 response with auth cookie and redirect to dashboard. Also test with invalid credentials to receive a 401 Unauthorized error."
+  },
+  {
+    "id": "TC002",
+    "title": "get register page and post registration data",
+    "description": "Test the GET /register endpoint to receive the registration form page with 200 status. Then test POST /register with valid registration data to receive 200 status and email confirmation sent."
+  },
+  {
+    "id": "TC003",
+    "title": "get forgot password page and post forgot password request",
+    "description": "Test the GET /forgot-password endpoint to receive the password reset form page with 200 status. Then test POST /forgot-password with a registered email to receive 200 status and password reset email sent."
+  },
+  {
+    "id": "TC004",
+    "title": "get main dashboard with and without authentication",
+    "description": "Test GET / with valid authentication to receive 200 status and dashboard page with KPI cards, agent grid, map, and discovery feed. Test GET / without authentication or with expired session to receive 302 redirect to /login."
+  },
+  {
+    "id": "TC005",
+    "title": "get agents list and delivery boy details with authentication",
+    "description": "Test GET /agents and GET /api/agents with valid auth to receive 200 status and agents data. Test GET /api/delivery-boys?id={validId} with auth to receive 200 delivery boy details, and with invalid id to receive 404 Not Found."
+  },
+  {
+    "id": "TC006",
+    "title": "get approved agents page and api with authentication",
+    "description": "Test GET /approved-agents and GET /api/agents?filter=approved with valid auth to receive 200 status and approved agents data. Test DELETE /api/agents/{id} with auth but insufficient role to receive 403 Forbidden."
+  },
+  {
+    "id": "TC007",
+    "title": "get orders listing and order tracking with authentication",
+    "description": "Test GET /orders and GET /api/orders with valid auth to receive 200 status and orders data. Test GET /order-tracking and GET /api/orders/{id}/tracking with auth to receive 200 status and tracking data. Test GET /api/orders with expired token to receive 401 Unauthorized and with invalid status filter to receive 400 Bad Request."
+  },
+  {
+    "id": "TC008",
+    "title": "get waste management pages and api endpoints with authentication",
+    "description": "Test GET /waste-management, /api/main-categories, /api/subcategories?categoryId={id}, and /api/products with valid auth to receive 200 status and respective data. Test POST /api/products with invalid schema (missing price) to receive 400 Validation error."
+  },
+  {
+    "id": "TC009",
+    "title": "get zoon os ai assistant endpoints with and without authentication",
+    "description": "Test POST /api/zoon with valid auth and message to receive 200 AI response with tool results. Test POST /api/zoon without auth to receive 401 Unauthorized. Test GET /api/zoon/discovery/pulse with valid CRON_SECRET to receive 200 discovery insights and without CRON_SECRET to receive 403 Forbidden."
+  },
+  {
+    "id": "TC010",
+    "title": "test security middleware on api endpoints",
+    "description": "Test that all /api/* endpoints require valid JWT authentication and respond with 401 Unauthorized if missing or invalid token. Test rate limiting by sending more than 100 requests in a short window to receive 429 Rate limited response. Verify audit logging and suspicious activity detection triggers on unauthorized or forbidden access."
+  }
+]

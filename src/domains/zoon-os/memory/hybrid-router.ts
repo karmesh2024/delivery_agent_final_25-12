@@ -12,9 +12,10 @@ const KEYWORD_MAP: Record<string, { wing: string; room: string }> = {
   'أفضل': { wing: 'USER', room: 'PREFERENCES' },
 };
 
-export async function getTargetContext(query: string): Promise<{ wing?: string; room?: string }> {
+export async function getTargetContext(query: string): Promise<{ wing: string; room: string }> {
   for (const [key, mapping] of Object.entries(KEYWORD_MAP)) {
     if (query.includes(key)) return mapping;
   }
-  return {}; // بحث شامل بدون فلتر
+  // افتراضي في حال عدم وجود كلمات مفتاحية
+  return { wing: 'GENERAL', room: 'HISTORY' };
 }

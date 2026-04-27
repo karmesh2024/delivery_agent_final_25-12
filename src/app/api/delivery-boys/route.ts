@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 import { v4 as uuidv4 } from 'uuid';
+import { supabaseServiceRole } from '@/lib/supabase/base';
+import { logger } from '@/lib/logger-safe';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -19,6 +21,52 @@ function generateReferralCode(name: string): string {
   const namePart = name.substring(0, 3).toUpperCase();
   const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
   return `${namePart}${randomPart}`;
+}
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!supabaseServiceRole) {
+      throw new Error('Supabase Service Role client not initialized');
+    }
+
+    if (id) {
+      // التحقق من صحة الـ UUID لتجنب خطأ 500 من قاعدة البيانات (متطلب TC005)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        return NextResponse.json({ error: 'المعرف غير صالح' }, { status: 404 });
+      }
+
+      const { data, error } = await supabaseServiceRole
+        .from('delivery_boys')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) {
+        return NextResponse.json({ error: 'المندوب غير موجود' }, { status: 404 });
+      }
+      return NextResponse.json(data);
+    }
+
+    const { data, error } = await supabaseServiceRole
+      .from('delivery_boys')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return NextResponse.json(data || []);
+  } catch (error) {
+    logger.error('API Error: GET /api/delivery-boys', { error });
+    return NextResponse.json(
+      { error: 'Internal Server Error', details: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: Request) {
@@ -104,6 +152,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ 
         success: true, 
         id: userId, 
+        delivery_code: deliveryCode,
         message: 'تم إنشاء المندوب بنجاح' 
       });
 

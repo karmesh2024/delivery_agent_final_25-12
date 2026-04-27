@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { Prisma } from '@prisma/client';
-import { generateSlug } from '@/lib/utils';
+import { generateSlug, serializeBigInt } from '@/lib/utils';
 
 export async function GET(request: Request) {
   try {
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
         sort_order: 'asc',
       },
     });
-    return NextResponse.json(subcategories);
+    return NextResponse.json(serializeBigInt(subcategories));
   } catch (error) {
     console.error('Error fetching subcategories:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

@@ -20,6 +20,11 @@ const NODE_META: Record<string, { icon: string; label: string; color: string; bg
   'deep_research': { icon: '🧠', label: 'بحث معمق', color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-300' },
   'image_ocr': { icon: '🖼️', label: 'قراءة صورة (OCR)', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-300' },
   'web_fetch': { icon: '🌐', label: 'قراءة موقع', color: 'text-cyan-600', bg: 'bg-cyan-50', border: 'border-cyan-300' },
+  'orchestrator': { icon: '🧠', label: 'المنسق الذكي', color: 'text-gray-700', bg: 'bg-gray-100', border: 'border-gray-400' },
+  'accounting': { icon: '💰', label: 'وكيل الحسابات', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-400' },
+  'inventory': { icon: '📦', label: 'وكيل المخازن', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-400' },
+  'reflection': { icon: '🧐', label: 'بوابة المراجعة', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-400' },
+  'parallel_executor': { icon: '⚡', label: 'التنفيذ الموازي', color: 'text-yellow-700', bg: 'bg-yellow-50', border: 'border-yellow-400' },
 };
 
 const toolNameTranslations: Record<string, string> = {
@@ -32,6 +37,11 @@ const toolNameTranslations: Record<string, string> = {
   'deep_research': 'بحث معمق',
   'image_ocr': 'قراءة صورة (OCR)',
   'web_fetch': 'قراءة موقع',
+  'orchestrator': 'المنسق الذكي',
+  'accounting': 'المحاسبة المالية',
+  'inventory': 'إدارة المخازن',
+  'reflection': 'مراجعة الجودة',
+  'parallel_executor': 'المعالجة المتوازية',
 };
 
 const STATE_BADGE: Record<string, { label: string; cls: string }> = {
@@ -225,7 +235,7 @@ export default function ZoonChat() {
   const [input, setInput] = useState("");
   const [newsBank, setNewsBank] = useState<BankItem[]>([]);
   const [showBank, setShowBank] = useState(false);
-  const [activeModel, setActiveModel] = useState<string>("gemini-1.5-flash");
+  const [activeModel, setActiveModel] = useState<string>("Zoon Swarm (Qwen/Ollama)");
   const [searchMode, setSearchMode] = useState<'auto' | 'web' | 'deep'>('auto');
   const [searchCategory, setSearchCategory] = useState<'general' | 'images' | 'social' | 'news'>('general');
   const [imageAnalysis, setImageAnalysis] = useState<Record<string, string>>({});

@@ -22,46 +22,55 @@ interface AgentGridViewProps {
 
 export function AgentGridView({ agents, className, onAgentClick }: AgentGridViewProps) {
   const getStatusColor = (status: string) => {
-    return status === 'online' ? 'bg-green-500' : 'bg-gray-400';
+    return status === 'online' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-500';
   };
 
-  // استخدام حالة لتخزين معرفات المندوبين مع الحفاظ على توافق التصيير بين الخادم والعميل
-  const [agentIdentifiers, setAgentIdentifiers] = useState<Record<string, string>>({});
+  const [isMounted, setIsMounted] = useState(false);
   
-  // تحديث المعرفات بعد التصيير على جانب العميل فقط
   useEffect(() => {
-    if (agents.length > 0) {
-      const identifiers: Record<string, string> = {};
-      agents.forEach(agent => {
-        identifiers[agent.id] = `A${agent.id.toString().slice(0, 1)}`;
-      });
-      setAgentIdentifiers(identifiers);
-    }
-  }, [agents]);
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) return null;
 
   return (
-    <div className={cn("mb-6", className)}>
-      <h2 className="text-lg font-semibold mb-4">Delivery Agents</h2>
-      <div className="flex flex-wrap gap-4 justify-center">
-        {agents.map((agent) => (
-          <div
-            key={agent.id}
-            className="flex flex-col items-center gap-1 cursor-pointer transition-transform hover:scale-105"
-            onClick={() => onAgentClick?.(agent)}
-          >
-            <div className="relative">
-              <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center border-2 border-background shadow-sm">
-                <span className="text-xl font-semibold text-foreground">{agentIdentifiers[agent.id] || `A${agent.id.toString().slice(0, 1)}`}</span>
-              </div>
-              <div
-                className={`absolute bottom-1 right-1 h-3 w-3 rounded-full border-2 border-background ${getStatusColor(agent.status)}`}
-              ></div>
+    <div className={cn("grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4", className)}>
+      {agents.map((agent) => (
+        <div
+          key={agent.id}
+          className="glass-card premium-hover p-4 flex flex-col items-center text-center cursor-pointer border-white/5 relative group"
+          onClick={() => onAgentClick?.(agent)}
+        >
+          {/* Status Indicator Glow */}
+          <div className={cn(
+            "absolute top-3 left-3 w-2 h-2 rounded-full",
+            getStatusColor(agent.status)
+          )} />
+          
+          <div className="relative mb-3">
+            <div className="h-16 w-16 rounded-2xl premium-gradient flex items-center justify-center shadow-lg shadow-blue-500/10 group-hover:scale-110 transition-transform duration-300">
+              <span className="text-xl font-black text-white italic">
+                {agent.name.charAt(0).toUpperCase()}
+              </span>
             </div>
-            <span className="text-sm font-medium text-foreground">{agent.name.split(' ')[0]}</span>
-            <span className="text-xs text-muted-foreground">{agent.status.charAt(0).toUpperCase() + agent.status.slice(1)}</span>
           </div>
-        ))}
-      </div>
+          
+          <div className="space-y-0.5">
+            <span className="text-sm font-bold block truncate max-w-[100px]">{agent.name}</span>
+            <span className={cn(
+              "text-[10px] font-bold uppercase tracking-wider",
+              agent.status === 'online' ? 'text-emerald-400' : 'text-slate-400'
+            )}>
+              {agent.status === 'online' ? 'متصل الآن' : 'غير متصل'}
+            </span>
+          </div>
+          
+          {/* Action Hint */}
+          <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="text-[10px] py-1 px-2 bg-white/5 rounded-lg border border-white/10 font-bold">عرض الملف</div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

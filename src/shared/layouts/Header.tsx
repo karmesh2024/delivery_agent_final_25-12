@@ -32,7 +32,7 @@ export function Header({ className, title = "لوحة التحكم", ...props }:
   return (
     <header 
       className={cn(
-        "flex h-16 items-center px-3 md:px-5 bg-card text-card-foreground transition-all duration-300 shadow-sm mt-8 mb-4 rounded-t-lg border-b border-border",
+        "flex h-20 items-center px-6 transition-all duration-300 glass-card rounded-3xl m-6 mb-8 border border-white/5",
          className
       )} 
       {...props}
@@ -40,59 +40,62 @@ export function Header({ className, title = "لوحة التحكم", ...props }:
       <div className="flex flex-1 items-center justify-between gap-x-4">
         {/* عنوان الصفحة */}
         <div className="flex items-center">
-          <h1 className="text-lg font-semibold tracking-tight text-foreground rtl:ml-2">{title}</h1>
+          <h1 className="text-2xl font-bold tracking-tight glow-text">{title}</h1>
         </div>
 
         {/* البحث والأزرار */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {/* البحث للشاشات المتوسطة والكبيرة */}
           <div className={cn(
             "transition-all duration-300 relative",
             {
-              "w-0 opacity-0 overflow-hidden md:w-60 md:opacity-100": !showSearch,
+              "w-0 opacity-0 overflow-hidden md:w-80 md:opacity-100": !showSearch,
               "w-full opacity-100": showSearch
             }
           )}>
             <GlobalSearch
-              placeholder="بحث عن مندوبين أو طلبات..."
+              placeholder="ابحث عن أي شيء هنا..."
               onClose={() => setShowSearch(false)}
-              className="w-full"
+              className="w-full h-12 bg-white/5 border-white/5 rounded-2xl premium-hover"
             />
           </div>
 
-          {/* زر بحث للشاشات الصغيرة */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="md:hidden text-muted-foreground hover:text-foreground hover:bg-muted"
-            onClick={() => setShowSearch(!showSearch)}
-          >
-            <FiSearch className="h-5 w-5" />
-          </Button>
+          {/* أزرار الإجراءات الفاخرة */}
+          <div className="flex items-center gap-2 bg-white/5 p-1 rounded-2xl border border-white/5">
+            {/* زر بحث للشاشات الصغيرة */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="md:hidden text-white/70 hover:text-white hover:bg-white/10 rounded-xl"
+              onClick={() => setShowSearch(!showSearch)}
+            >
+              <FiSearch className="h-5 w-5" />
+            </Button>
 
-          {/* زر الإشعارات */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="relative text-muted-foreground hover:text-foreground hover:bg-muted"
-          >
-            <FiBell className="h-5 w-5" />
-            <span className="absolute top-1.5 right-1.5 flex h-2 w-2 rounded-full bg-blue-500 ring-2 ring-background"></span>
-          </Button>
+            {/* زر الإشعارات */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="relative text-white/70 hover:text-white hover:bg-white/10 rounded-xl"
+            >
+              <FiBell className="h-5 w-5" />
+              <span className="absolute top-2 right-2 flex h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-[#0a0f18] animate-pulse"></span>
+            </Button>
 
-          {/* زر تبديل الوضع المظلم/الفاتح */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="text-muted-foreground hover:text-foreground hover:bg-muted"
-          >
-            {mounted && theme === "dark" ? (
-              <FiSun className="h-5 w-5" />
-            ) : (
-              <FiMoon className="h-5 w-5" />
-            )}
-          </Button>
+            {/* زر تبديل الوضع المظلم/الفاتح */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl"
+            >
+              {mounted && theme === "dark" ? (
+                <FiSun className="h-5 w-5" />
+              ) : (
+                <FiMoon className="h-5 w-5" />
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </header>

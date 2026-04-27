@@ -13,8 +13,9 @@ export * from './supabase/agents';
 // 3. وظائف الطلبات (Orders)
 export * from './supabase/orders';
 
-// 4. إدارة المناطق الجغرافية (Geographic)
+// 4. إدارة المناطق الجغرافية والتوصيل (Geographic & Delivery Zones)
 export * from './supabase/geographic';
+export * from './supabase/deliveryZones';
 
 // 5. إدارة المستندات والملفات (Documents)
 export * from './supabase/documents';

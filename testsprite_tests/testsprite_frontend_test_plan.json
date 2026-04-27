@@ -1,0 +1,1054 @@
+[
+  {
+    "id": "TC001",
+    "title": "Log in and reach the dashboard",
+    "description": "Verifies an admin can log in with valid credentials and land on the main dashboard with core widgets visible.",
+    "category": "Authentication System",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the dashboard"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify dashboard widgets for KPIs, agents, map, and recent orders are displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC002",
+    "title": "Prevent access to dashboard when not authenticated",
+    "description": "Verifies that an unauthenticated user attempting to access the dashboard is redirected to the login page.",
+    "category": "Main Dashboard",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user is redirected to the login page"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC003",
+    "title": "Load dashboard with core operational widgets",
+    "description": "Verifies a logged-in admin can load the dashboard and see KPI cards, agent grid, map, and discovery feed.",
+    "category": "Main Dashboard",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify KPI cards are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the agent grid and the interactive map are displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC004",
+    "title": "Open the agents page from the dashboard",
+    "description": "Verifies a dispatcher can navigate from the dashboard to the agents list page and see the agents list content.",
+    "category": "Agent Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation control to view agents"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the agents list page is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a list or grid of agents is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC005",
+    "title": "View points transaction history",
+    "description": "Verifies a finance admin can open financial management and see points transaction history displayed.",
+    "category": "Financial Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /financial-management"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify points transaction history is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC006",
+    "title": "Reject invalid login credentials",
+    "description": "Verifies entering invalid credentials prevents login and shows an authentication error while remaining unauthenticated.",
+    "category": "Authentication System",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill invalid-user@example.com into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill wrong-password into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a login error is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user remains on the login page"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC007",
+    "title": "Redeem points successfully within withdrawal limits",
+    "description": "Verifies a finance admin can redeem points within limits and sees a success confirmation and updated points state.",
+    "category": "Financial Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /financial-management"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid redeemable amount within the allowed limit into the points redemption amount field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the points redemption request"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a redemption success confirmation is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the points history reflects the new redemption entry"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC008",
+    "title": "Filter agents by status on agents page",
+    "description": "Verifies an admin can filter the agents list by status and the results update accordingly.",
+    "category": "Agent Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation control to view agents"
+      },
+      {
+        "type": "action",
+        "description": "Select a specific status filter for agents"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the agents list updates to show agents matching the selected status"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC009",
+    "title": "Open payments list",
+    "description": "Verifies an authenticated user can open the payments page and see a list of payment records.",
+    "category": "Payments",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /payments"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a list of payments is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC010",
+    "title": "View agent details from the agents list",
+    "description": "Verifies an admin can open an agent detail view from the agents list and see agent information displayed.",
+    "category": "Agent Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation control to view agents"
+      },
+      {
+        "type": "action",
+        "description": "Open the details for one agent in the list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an agent detail view is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify agent profile or performance information is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC011",
+    "title": "Switch dashboard agent status filter",
+    "description": "Verifies the dashboard agent grid can be filtered by an agent status and the displayed agent list updates accordingly.",
+    "category": "Main Dashboard",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Select a different agent status in the dashboard agent status filter"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the agent grid updates to reflect the selected status"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC012",
+    "title": "View customers list",
+    "description": "Verifies an authenticated admin can open the customers page and see a list of customers.",
+    "category": "Customer Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /customers"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a customers list is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC013",
+    "title": "Prevent redemption when amount exceeds withdrawal limit",
+    "description": "Verifies submitting a redemption above the limit is blocked and a withdrawal limit validation error is shown.",
+    "category": "Financial Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /financial-management"
+      },
+      {
+        "type": "action",
+        "description": "Fill an amount that clearly exceeds the displayed withdrawal limit into the points redemption amount field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the points redemption request"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a withdrawal limit validation error is visible"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC014",
+    "title": "Filter payments by a valid status",
+    "description": "Verifies a user can apply a valid status filter and the payments list updates accordingly.",
+    "category": "Payments",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /payments"
+      },
+      {
+        "type": "action",
+        "description": "Select a valid payment status in the status filter control"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the payments list updates to reflect the selected status filter"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC015",
+    "title": "Search or filter customers",
+    "description": "Verifies an admin can narrow the customers list using an on-page search or filter control.",
+    "category": "Customer Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /customers"
+      },
+      {
+        "type": "action",
+        "description": "Fill a query into the customer search field using a generic term likely to match multiple records"
+      },
+      {
+        "type": "action",
+        "description": "Submit the search"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the customers list updates to match the search query"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC016",
+    "title": "Open unregistered customers list",
+    "description": "Verifies an authenticated admin can open unregistered customers and see the page content rendered.",
+    "category": "Customer Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /unregistered-customers"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify unregistered customers are displayed or an empty state is visible"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC017",
+    "title": "View messaging threads",
+    "description": "Verifies an authenticated user can access the messages area and see message threads listed.",
+    "category": "Messaging System",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open the messages area"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a list of message threads is displayed"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC018",
+    "title": "Request a password reset from forgot password page",
+    "description": "Verifies an admin can request a password reset email from the forgot password page and sees a confirmation state.",
+    "category": "Authentication System",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /forgot-password"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid email address into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the password reset request form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a password reset request confirmation is visible"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC019",
+    "title": "Create a new message thread",
+    "description": "Verifies an authenticated user can create a new messaging thread and it appears in the threads list.",
+    "category": "Messaging System",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open the messages area"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new message thread"
+      },
+      {
+        "type": "action",
+        "description": "Select a valid recipient or participant"
+      },
+      {
+        "type": "action",
+        "description": "Fill a subject value into the subject field"
+      },
+      {
+        "type": "action",
+        "description": "Fill a short message into the message body field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the new thread"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the new thread appears in the threads list"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC020",
+    "title": "View administrators list",
+    "description": "Verifies a Super Admin can access the admins area and see a list of administrators displayed.",
+    "category": "Admin Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open the admins area"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a list of administrators is displayed"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC021",
+    "title": "View permissions and roles data",
+    "description": "Verifies a Super Admin can open the permissions area and see permissions and roles displayed.",
+    "category": "Permissions and Roles",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open the permissions area"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a permissions list and a roles list are displayed"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC022",
+    "title": "Navigate to registration and submit new admin registration",
+    "description": "Verifies a new admin can open the registration page and submit the registration form with valid information.",
+    "category": "Authentication System",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /register"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid email address into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid password into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Fill matching password confirmation into the confirm password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the registration form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a registration submitted confirmation state is visible"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC023",
+    "title": "Handle invalid payments status filter input",
+    "description": "Verifies using an unknown status filter value results in a visible validation or error state without breaking the page.",
+    "category": "Payments",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /payments"
+      },
+      {
+        "type": "action",
+        "description": "Fill an unknown value into the payment status filter input if it is editable"
+      },
+      {
+        "type": "action",
+        "description": "Apply the payments filters"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an invalid filter error is visible or the filter is rejected without applying"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC024",
+    "title": "Create a new administrator with a valid role",
+    "description": "Verifies a Super Admin can create a new administrator and the new admin appears in the admins list.",
+    "category": "Admin Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open the admins area"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new administrator"
+      },
+      {
+        "type": "action",
+        "description": "Fill a unique name into the name field"
+      },
+      {
+        "type": "action",
+        "description": "Fill a unique email into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Select a valid role for the administrator"
+      },
+      {
+        "type": "action",
+        "description": "Submit the new administrator form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the newly created administrator appears in the administrators list"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC025",
+    "title": "Hide or block role editing for non-admin users",
+    "description": "Verifies a non-admin user cannot access role editing controls or complete a role update from the permissions area.",
+    "category": "Permissions and Roles",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open the permissions area"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to open role editing for an existing role"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify role editing is not available or access is blocked for the current user"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC026",
+    "title": "Prevent sending an empty message",
+    "description": "Verifies the messaging composer prevents sending when the message body is empty and shows a validation error.",
+    "category": "Messaging System",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open the messages area"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new message thread"
+      },
+      {
+        "type": "action",
+        "description": "Select a valid recipient or participant"
+      },
+      {
+        "type": "action",
+        "description": "Fill a subject value into the subject field"
+      },
+      {
+        "type": "action",
+        "description": "Leave the message body empty"
+      },
+      {
+        "type": "action",
+        "description": "Submit the new thread"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a message body validation error is visible and the thread is not created"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC027",
+    "title": "Prevent administrator creation when role is invalid or missing",
+    "description": "Verifies the create-admin form blocks submission and shows a validation error when the role input is invalid or missing.",
+    "category": "Admin Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open the admins area"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new administrator"
+      },
+      {
+        "type": "action",
+        "description": "Fill a unique name into the name field"
+      },
+      {
+        "type": "action",
+        "description": "Fill a unique email into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Clear the role selection so no role is selected"
+      },
+      {
+        "type": "action",
+        "description": "Submit the new administrator form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a role validation error is visible and the administrator is not created"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC028",
+    "title": "Prevent creating a permission when required fields are missing",
+    "description": "Verifies the permission creation UI enforces required fields and shows a validation error when the input is incomplete.",
+    "category": "Permissions and Roles",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open the permissions area"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new permission"
+      },
+      {
+        "type": "action",
+        "description": "Leave required fields empty"
+      },
+      {
+        "type": "action",
+        "description": "Submit the permission form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a validation error is visible and the permission is not created"
+      }
+    ],
+    "priority": "Low"
+  }
+]

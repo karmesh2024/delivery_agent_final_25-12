@@ -33,6 +33,7 @@ import zoonCirclesReducer from "@/domains/zoon-club/store/zoonCirclesSlice";
 import messagesReducer from "@/domains/messages/store/messagesSlice";
 import zoonReducer from "./slices/zoonSlice";
 import aiSkillsReducer from "./slices/aiSkillsSlice";
+import tripsReducer from "@/domains/trips/store/tripsSlice";
 
 
 
@@ -72,6 +73,7 @@ export const store = configureStore({
     zoonCircles: zoonCirclesReducer,
     messages: messagesReducer,
     zoon: zoonReducer,
+    trips: tripsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

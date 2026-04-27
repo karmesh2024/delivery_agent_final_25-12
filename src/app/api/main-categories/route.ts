@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { Prisma } from '@prisma/client';
+import { serializeBigInt } from '@/lib/utils';
 
 export async function GET(request: Request) {
   try {
@@ -17,7 +18,6 @@ export async function GET(request: Request) {
       orderBy: {
         created_at: 'asc'
       },
-      // catalog_category_id موجود مباشرة في store_main_categories، لا حاجة لـ include
     });
     
     // ترتيب النتائج يدوياً حسب sort_order
@@ -27,17 +27,15 @@ export async function GET(request: Request) {
       if (aOrder !== bOrder) {
         return aOrder - bOrder;
       }
-      // في حالة تساوي sort_order، استخدم created_at
       const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
       const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
       return aDate - bDate;
     });
-    return NextResponse.json(sortedCategories);
+
+    return NextResponse.json(serializeBigInt(sortedCategories));
   } catch (error) {
     console.error('Error fetching main categories:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorDetails = error instanceof Error ? error.stack : String(error);
-    console.error('Error details:', errorDetails);
     return NextResponse.json({ 
       message: 'Failed to fetch main categories',
       error: errorMessage 

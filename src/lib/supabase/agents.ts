@@ -26,6 +26,7 @@ export async function getAgents(): Promise<Agent[]> {
     return {
       id: deliveryBoy.id,
       name: deliveryBoy.full_name,
+      full_name: deliveryBoy.full_name,
       status: agentStatus,
       avatar_url: deliveryBoy.profile_image_url || "",
       rating: parseFloat(deliveryBoy.rating) || 0,
@@ -106,14 +107,59 @@ export async function updateAgentStatus(
   return {
     id: deliveryBoy.id,
     name: deliveryBoy.full_name,
+    full_name: deliveryBoy.full_name,
     status: agentStatus,
     avatar_url: deliveryBoy.profile_image_url || "",
-    rating: deliveryBoy.rating,
-    total_deliveries: deliveryBoy.total_deliveries,
+    rating: parseFloat(deliveryBoy.rating) || 0,
+    total_deliveries: deliveryBoy.total_deliveries || 0,
     phone: deliveryBoy.phone,
-    last_active: deliveryBoy.last_location_update,
+    last_active: deliveryBoy.last_location_update || deliveryBoy.updated_at,
     license_photo_url: deliveryBoy.license_photo_url,
     status_reason: deliveryBoy.status_reason,
     status_changed_at: deliveryBoy.status_changed_at,
   };
+}
+
+export async function getDeliveryBoyById(id: string) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("delivery_boys")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    apiLogger.error(`Error fetching delivery boy by id ${id}:`, { error });
+    return null;
+  }
+
+  return data;
+}
+export async function createDeliveryBoy(payload: any) {
+  try {
+    const response = await fetch('/api/delivery-boys', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'فشل إنشاء المندوب');
+    }
+
+    const data = await response.json();
+    // إرجاع هيكل البيانات المتوقع من قبل المكون FullAddAgentForm
+    return {
+      id: data.id,
+      delivery_code: data.delivery_code, // تأكد من أن الـ API يرجع هذا أو سيكون متاحاً لاحقاً
+      data: {
+        user: { id: data.id },
+        delivery_boy: { id: data.id, delivery_code: data.delivery_code }
+      }
+    };
+  } catch (error) {
+    console.error('Error in createDeliveryBoy wrapper:', error);
+    throw error;
+  }
 }

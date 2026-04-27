@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { MemoryManager } from '@/domains/zoon-os/memory/memory-manager';
 
 const saveMemorySchema = z.object({
-  memory_type: z.enum(['preference', 'task', 'conversation']).describe('نوع المعلومة: preference (تفضيلات), task (مهمة/أمر), conversation (سياق عام)'),
+  memory_type: z.enum(['preference', 'task', 'conversation', 'FACT', 'INSIGHT']).describe('نوع المعلومة: preference (تفضيلات), task (مهمة/أمر), conversation (سياق عام), FACT (حقيقة ثابتة), INSIGHT (استنتاج)'),
   content: z.string().describe('المعلومة أو التفاصيل المراد للوكيل حفظها وتذكرها'),
   tags: z.array(z.string()).optional().describe('كلمات دلالية للبحث (مثال: "اسمي", "مندوب", "تقارير")')
 });
@@ -13,7 +13,7 @@ const saveMemorySchema = z.object({
  * لحفظ طلبات أو معلومات المستخدم لتذكرها للمستقبل.
  */
 export const memoryTool = tool({
-  description: 'احفظ معلومة هامة أخبرك بها المستخدم (مثل اسمه، طريقة رد معينة، أو مهام مؤجلة) لتتذكرها وتستخدمها للرد عليه في المحادثات القادمة.',
+  description: 'احفظ معلومة هامة أخبرك بها المستخدم (مثل اسمه، طريقة رد معينة، أو تفضيلات عائلية) لتتذكرها للمستقبل. تنبيه: احفظ الأسماء العربية كما ذكرها المستخدم تماماً ولا تقم بترجمتها أو تغيير هجائها (مثال: ريتال تبقى ريتال ولا تتحول لـ Riteel).',
   inputSchema: saveMemorySchema,
   execute: async (input: any, context?: { userId?: string; toolCallId?: string; messages?: any[] }) => {
     try {
@@ -25,7 +25,7 @@ export const memoryTool = tool({
 
       const savedMemory = await MemoryManager.saveMemory(
         USER_ID, 
-        input.memory_type, 
+        input.memory_type || input.type, // دعم التسميات المختلفة لتجنب الفشل
         input.content, 
         input.tags || []
       );

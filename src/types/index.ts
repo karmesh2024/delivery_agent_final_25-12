@@ -184,6 +184,7 @@ export interface UpdateAgentPayload {
 export interface Agent {
   id: string;
   name: string;
+  full_name?: string | null;
   status: "online" | "offline" | "busy";
   avatar_url?: string | null;
   location?: GeoPoint;

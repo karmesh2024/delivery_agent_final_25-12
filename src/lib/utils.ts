@@ -32,3 +32,27 @@ export function generateSlug(name: string): string {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
 }
+
+export function serializeBigInt(value: any): any {
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(serializeBigInt);
+  }
+
+  if (typeof value === 'object') {
+    const serialized: Record<string, any> = {};
+    for (const [key, val] of Object.entries(value)) {
+      serialized[key] = serializeBigInt(val);
+    }
+    return serialized;
+  }
+
+  return value;
+}
