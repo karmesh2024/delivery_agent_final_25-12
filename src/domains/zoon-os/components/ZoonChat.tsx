@@ -240,6 +240,8 @@ export default function ZoonChat() {
   const [searchCategory, setSearchCategory] = useState<'general' | 'images' | 'social' | 'news'>('general');
   const [imageAnalysis, setImageAnalysis] = useState<Record<string, string>>({});
   const [isAnalyzing, setIsAnalyzing] = useState<Record<string, boolean>>({});
+  const [swarmTrace, setSwarmTrace] = useState<{ agent: string; action: string; status: string; duration: number }[]>([]);
+  const [swarmIntent, setSwarmIntent] = useState<string>('');
 
   // دالة تحليل الصورة عند الطلب
   const handleAnalyzeImage = async (imageUrl: string, title: string) => {
@@ -285,13 +287,28 @@ export default function ZoonChat() {
   // مسح البنك بالكامل
   const clearBank = () => setNewsBank([]);
 
-  // استخدام fetch مخصص لالتقاط الهيدرات أثناء الإرسال وقراءة x-zoon-model
+  // استخدام fetch مخصص لالتقاط الهيدرات أثناء الإرسال وقراءة x-zoon-model + x-zoon-trace
   const customFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const res = await fetch(input, init);
     const modelFromHeader = res.headers.get('x-zoon-model');
     if (modelFromHeader) {
       setActiveModel(modelFromHeader);
     }
+    // قراءة بيانات تتبع السرب
+    const traceHeader = res.headers.get('x-zoon-trace');
+    if (traceHeader) {
+      try {
+        const decoded = JSON.parse(atob(traceHeader));
+        setSwarmTrace(decoded);
+      } catch (e) {
+        console.error('Failed to parse swarm trace:', e);
+      }
+    } else {
+      setSwarmTrace([]);
+    }
+    const intentHeader = res.headers.get('x-zoon-intent');
+    if (intentHeader) setSwarmIntent(intentHeader);
+    else setSwarmIntent('');
     return res;
   };
 
@@ -428,82 +445,141 @@ export default function ZoonChat() {
                   </div>
                )}
 
-               {message.parts.map((part: any, index: number) => {
-
-                // ── نص عادي ──
-                if (part.type === 'text') {
+                {message.role === 'assistant' && swarmTrace.length > 0 && message.id === messages[messages.length - 1]?.id && (() => {
+                  const icons: Record<string, string> = { orchestrator: '🧠', inventory: '📦', financial: '💰', reflection: '🔍', search: '🔎', memory: '🧬' };
                   return (
-                    <div key={`t-${index}`} className="text-gray-800 text-sm leading-relaxed prose prose-sm prose-green prose-img:rounded-xl prose-img:shadow-md">
-                      {message.role === 'user' && <span className="font-bold block mb-1">👤 أنت: </span>}
-                      <ReactMarkdown
-                        components={{
-                          img: ({ src, alt, ...props }) => {
-                            if (!src) return null;
-                            return <img 
-                              src={src} 
-                              alt={alt || "صورة توضيحية"} 
-                              {...props} 
-                              className="max-h-[300px] w-auto inline-block rounded-xl shadow-md border border-gray-200 mt-2 object-contain bg-gray-50"
-                              onError={(e: any) => e.target.style.display='none'}
-                              loading="lazy"
-                            />;
-                          },
-                          a: ({ href, children }) => {
-                            if (!href) return null;
-                            const url = href;
-                            const title = String(children);
-                            const itemId = `${url}`;
-                            const isInBank = newsBank.some(b => b.id === itemId);
-                            const safeHostname = url.startsWith('http') ? new URL(url).hostname : 'رابط خارجي';
-                            
-                            return (
-                              <span className="my-2 p-3 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow flex items-center gap-3 min-w-0" style={{ display: 'flex' }}>
-                                <span className="p-2 bg-blue-50 rounded-lg text-blue-600 flex-shrink-0">
-                                  <img 
-                                    src={`https://www.google.com/s2/favicons?domain=${safeHostname}&sz=32`} 
-                                    alt="" 
-                                    className="w-5 h-5 block"
-                                    onError={(e: any) => e.target.src = 'https://www.google.com/favicon.ico'}
-                                  />
-                                </span>
-                                <span className="flex-1 min-w-0 overflow-hidden text-right block">
-                                  <span className="block text-[10px] text-gray-400 font-bold uppercase truncate w-full">{safeHostname}</span>
-                                  <span className="block text-[13px] font-bold text-gray-900 truncate leading-tight w-full mt-0.5">{title}</span>
-                                </span>
-                                <span className="flex items-center gap-1.5 flex-shrink-0">
-                                  <a 
-                                    href={url} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="text-[10px] px-2.5 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg font-black transition-colors flex items-center gap-1"
-                                  >
-                                    🔗 فتح
-                                  </a>
-                                  <button
-                                    onClick={() => {
-                                      if (isInBank) {
-                                        removeFromBank(itemId);
-                                      } else {
-                                        addToBank({ id: itemId, title, source: safeHostname, link: url });
-                                      }
-                                    }}
-                                    className={`text-[10px] px-2.5 py-1.5 rounded-lg font-black transition-colors flex items-center gap-1 ${
-                                      isInBank ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                                    }`}
-                                  >
-                                    {isInBank ? '❌' : '📥 حفظ'}
-                                  </button>
-                                </span>
-                              </span>
-                            );
-                          }
-                        }}
-                      >
-                        {part.text}
-                      </ReactMarkdown>
+                    <div className="mb-3 p-2.5 bg-gradient-to-l from-indigo-50/80 via-blue-50/60 to-transparent border border-indigo-100/60 rounded-xl">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="text-xs">⚡</span>
+                        <span className="text-[10px] font-black text-indigo-600 uppercase tracking-wider">مسار السرب — {swarmIntent || 'معالجة'}</span>
+                      </div>
+                      <div className="flex items-center gap-0.5 flex-wrap">
+                        {swarmTrace.map((step: any, si: number) => {
+                          const icon = Object.entries(icons).find(([k]) => step.agent.toLowerCase().includes(k))?.[1] || '⚙️';
+                          const isDone = step.status === 'done';
+                          return (
+                            <div key={si} className="flex items-center gap-0.5">
+                              <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border ${isDone ? 'bg-green-50 border-green-200 text-green-700' : 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse'}`}>
+                                <span>{icon}</span>
+                                <span className="max-w-[80px] truncate">{step.agent}</span>
+                                <span className={`w-1.5 h-1.5 rounded-full ${isDone ? 'bg-green-400' : 'bg-amber-400'}`} />
+                              </div>
+                              {si < swarmTrace.length - 1 && <span className={`text-[8px] mx-0.5 ${isDone ? 'text-green-400' : 'text-gray-300'}`}>→</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   );
-                }
+                })()}
+
+               {/* ── عارض محتوى الرسالة ── */}
+               {(() => {
+                 // تجميع كل النصوص من الأجزاء
+                 const textContent = message.parts
+                   ?.filter((p: any) => p.type === 'text' || p.type === 'text-delta')
+                   .map((p: any) => p.text || p.textDelta || p.delta || '')
+                   .join('') || '';
+                 
+                 // Fallback: استخدام content مباشرة إذا لم تتوفر أجزاء نصية
+                 const displayContent = textContent || 
+                   (typeof (message as any).content === 'string' ? (message as any).content : '') ||
+                   '';
+
+                 if (displayContent) {
+                   return (
+                     <div className="text-gray-800 text-sm leading-relaxed prose prose-sm prose-green prose-img:rounded-xl prose-img:shadow-md">
+                       {message.role === 'user' && <span className="font-bold block mb-1">👤 أنت: </span>}
+                       <ReactMarkdown
+                         components={{
+                           img: ({ src, alt, ...props }) => {
+                             if (!src) return null;
+                             return <img 
+                               src={src} 
+                               alt={alt || "صورة توضيحية"} 
+                               {...props} 
+                               className="max-h-[300px] w-auto inline-block rounded-xl shadow-md border border-gray-200 mt-2 object-contain bg-gray-50"
+                               onError={(e: any) => e.target.style.display='none'}
+                               loading="lazy"
+                             />;
+                           },
+                           a: ({ href, children }) => {
+                             if (!href) return null;
+                             const url = href;
+                             const title = String(children);
+                             const itemId = `${url}`;
+                             const isInBank = newsBank.some(b => b.id === itemId);
+                             const safeHostname = url.startsWith('http') ? new URL(url).hostname : 'رابط خارجي';
+                             
+                             return (
+                               <span className="my-2 p-3 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow flex items-center gap-3 min-w-0" style={{ display: 'flex' }}>
+                                 <span className="p-2 bg-blue-50 rounded-lg text-blue-600 flex-shrink-0">
+                                   <img 
+                                     src={`https://www.google.com/s2/favicons?domain=${safeHostname}&sz=32`} 
+                                     alt="" 
+                                     className="w-5 h-5 block"
+                                     onError={(e: any) => e.target.src = 'https://www.google.com/favicon.ico'}
+                                   />
+                                 </span>
+                                 <span className="flex-1 min-w-0 overflow-hidden text-right block">
+                                   <span className="block text-[10px] text-gray-400 font-bold uppercase truncate w-full">{safeHostname}</span>
+                                   <span className="block text-[13px] font-bold text-gray-900 truncate leading-tight w-full mt-0.5">{title}</span>
+                                 </span>
+                                 <span className="flex items-center gap-1.5 flex-shrink-0">
+                                   <a 
+                                     href={url} 
+                                     target="_blank" 
+                                     rel="noopener noreferrer"
+                                     className="text-[10px] px-2.5 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg font-black transition-colors flex items-center gap-1"
+                                   >
+                                     🔗 فتح
+                                   </a>
+                                   <button
+                                     onClick={() => {
+                                       if (isInBank) {
+                                         removeFromBank(itemId);
+                                       } else {
+                                         addToBank({ id: itemId, title, source: safeHostname, link: url });
+                                       }
+                                     }}
+                                     className={`text-[10px] px-2.5 py-1.5 rounded-lg font-black transition-colors flex items-center gap-1 ${
+                                       isInBank ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                                     }`}
+                                   >
+                                     {isInBank ? '❌' : '📥 حفظ'}
+                                   </button>
+                                 </span>
+                               </span>
+                             );
+                           }
+                         }}
+                       >
+                         {displayContent}
+                       </ReactMarkdown>
+                     </div>
+                   );
+                 }
+
+                 // 🔍 تشخيص: إذا لم يتم عرض أي نص، أظهر بيانات التصحيح
+                 if (message.role === 'assistant' && !displayContent) {
+                   return (
+                     <div className="text-[10px] bg-yellow-50 border border-yellow-200 rounded p-2 mt-1">
+                       <div className="font-bold text-yellow-700 mb-1">🔍 تشخيص الأجزاء ({message.parts?.length || 0} جزء):</div>
+                       {message.parts?.map((p: any, i: number) => (
+                         <div key={i} className="text-yellow-600">
+                           [{i}] type="{p.type}" | keys={Object.keys(p).join(',')} | text="{(p.text || p.textDelta || p.delta || '').slice(0, 50)}"
+                         </div>
+                       ))}
+                       {!message.parts?.length && <div className="text-red-500">⚠️ لا توجد أجزاء! content: "{String((message as any).content || '').slice(0, 100)}"</div>}
+                     </div>
+                   );
+                 }
+
+                 return null;
+               })()}
+
+               {/* ── أجزاء الأدوات (Tool Parts) ── */}
+               {message.parts.map((part: any, index: number) => {
 
                 // ── أداة: مختصرة في الشات (التفاصيل في الورك فلو) ──
                 if (part.type?.startsWith('tool-')) {

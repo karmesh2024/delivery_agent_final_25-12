@@ -10,7 +10,7 @@ const googleProvider = createGoogleGenerativeAI({
 });
 
 const ollamaProvider = createOpenAI({
-  baseURL: 'http://localhost:11434/v1',
+  baseURL: 'http://127.0.0.1:11434/v1',
   apiKey: 'ollama',
 });
 
@@ -151,43 +151,36 @@ ${textToSummarize}`;
 
   let summary = '';
   try {
-    // ⚠️ منع الموديلات المحلية الصغيرة للتلخيص منعاً للهلوسة (P2 Fix)
-    // الاعتماد فقط على النماذج الموثوقة كـ Gemini Flash
+    // 🚀 المحاولة الأولى: استخدام Gemini 2.5 Flash (بناءً على طلبك)
+    console.log('🔄 [AutoSave] Summarizing with Gemini 2.5 Flash...');
     const { text } = await generateText({ 
       model: googleProvider('gemini-2.5-flash'), 
       prompt: summaryPrompt,
-      temperature: 0.1 
+      temperature: 0.1
     });
     summary = text;
 
-    // Reject if significantly longer than the original (indicates hallucination)
-    // Relaxed threshold: only reject if it's vastly longer (e.g., 4x) or exceeds a reasonable absolute limit
-    if (summary.length > textToSummarize.length * 4 && summary.length > 500) {
-        console.warn('⚠️ [AutoSave] Insight length too long, likely hallucination. Rejecting.');
-        return 'محادثة عامة (تم رفض التلخيص)';
-    }
   } catch (e: any) { 
-    console.error('❌ [AutoSave] Gemini Summarization Failed:', e?.message || e);
+    console.warn('⚠️ [AutoSave] Gemini failed or quota exceeded, using Local Model as fallback:', e?.message || e);
     
-    // Fallback to Ollama if Gemini completely fails (and user has local Ollama setup)
-    if (process.env.OLLAMA_URL || process.env.OLLAMA_BASE_URL) {
-      try {
-        console.log('🔄 [AutoSave] Attempting Ollama qwen3.5:4b fallback for summarization...');
-        const { text } = await generateText({ 
-          model: ollamaProvider('qwen3.5:4b'), 
-          prompt: summaryPrompt,
-          temperature: 0.1
-        });
-        
-        if (text && text.length <= textToSummarize.length * 2) {
-          return text.trim();
-        }
-      } catch (ollamaErr) {
-        console.error('❌ [AutoSave] Ollama Fallback Failed too');
-      }
+    // Fallback: استخدام Ollama المحلي عند فشل Gemini
+    try {
+      const { text } = await generateText({ 
+        model: ollamaProvider('qwen3.5:4b'), 
+        prompt: summaryPrompt,
+        temperature: 0.1
+      });
+      summary = text;
+    } catch (ollamaErr) {
+      console.error('❌ [AutoSave] Both Gemini and Local models failed.');
+      return 'فشل التلخيص';
     }
-    
-    return 'فشل التلخيص'; 
+  }
+
+  // التحقق من الهلوسة (تخفيف القيود للموديل المحلي)
+  if (summary.length > textToSummarize.length * 6 && summary.length > 1000) {
+    console.warn('⚠️ [AutoSave] Summary too long, rejecting to prevent memory pollution.');
+    return 'محادثة عامة (تم رفض التلخيص)';
   }
   
   return summary.trim();

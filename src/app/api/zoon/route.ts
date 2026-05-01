@@ -50,43 +50,35 @@ import { StateManager } from '@/domains/zoon-os/execution/state-manager';
 import { swarmGraph } from '@/domains/zoon-os/swarm/graph';
 import { ZoonState } from '@/domains/zoon-os/types/state';
 
-const ollama = createOpenAI({
-  baseURL: 'http://localhost:11434/v1',
-  apiKey: 'ollama',
-});
-
 export const maxDuration = 300; 
 
-// تهيئة عميل Supabase (بصلاحيات الخدمة لجلب السياق الإداري)
+// تهيئة عميل Supabase
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// إعداد مقدمي الخدمة
+const googleProvider = createGoogleGenerativeAI({
+  apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+});
+
+const ollamaProvider = createOpenAI({
+  baseURL: 'http://localhost:11434/v1',
+  apiKey: 'ollama',
+});
+
 /**
- * استخراج النص من رسالة بأي تنسيق (content string / parts array / object)
+ * استخراج النص من رسالة بأي تنسيق
  */
 function extractTextFromMessage(m: any): string {
-  // 1. إذا كان content نصاً مباشراً
-  if (typeof m.content === 'string' && m.content.trim()) {
-    return m.content;
-  }
-  // 2. إذا كان يحتوي على parts (تنسيق @ai-sdk/react v3+)
+  if (typeof m.content === 'string' && m.content.trim()) return m.content;
   if (Array.isArray(m.parts)) {
-    return m.parts
-      .filter((p: any) => p.type === 'text' || typeof p.text === 'string')
-      .map((p: any) => p.text || '')
-      .join('\n')
-      .trim();
+    return m.parts.filter((p: any) => p.type === 'text' || typeof p.text === 'string').map((p: any) => p.text || '').join('\n').trim();
   }
-  // 3. إذا كان content مصفوفة
   if (Array.isArray(m.content)) {
-    return m.content
-      .map((p: any) => p.text || (typeof p === 'string' ? p : ''))
-      .join('\n')
-      .trim();
+    return m.content.map((p: any) => p.text || (typeof p === 'string' ? p : '')).join('\n').trim();
   }
-  // 4. إذا كان content كائناً
   if (typeof m.content === 'object' && m.content !== null) {
     return m.content.text || m.content.content || JSON.stringify(m.content);
   }
@@ -96,20 +88,8 @@ function extractTextFromMessage(m: any): string {
 function convertToModelMessages(messages: any[]) {
   return messages
     .filter(m => m.role === 'user' || m.role === 'assistant' || m.role === 'system')
-    .map(m => ({
-      role: m.role,
-      content: extractTextFromMessage(m) || '...'
-    }))
+    .map(m => ({ role: m.role, content: extractTextFromMessage(m) || '...' }))
     .filter(m => m.content.trim() !== '');
-}
-
-async function executeToolSafely(name: string, fn: () => Promise<any>) {
-  try {
-    return await fn();
-  } catch (error: any) {
-    console.error(`❌ [Tool Error: ${name}]:`, error);
-    return { success: false, error: error.message };
-  }
 }
 
 export async function POST(req: Request) {
@@ -117,7 +97,6 @@ export async function POST(req: Request) {
     const { messages }: { messages: any[] } = await req.json();
     const origin = new URL(req.url).origin;
     
-    // ① جلب هوية المستخدم الديناميكية من الـ Headers (المُعدّة في Middleware)
     const USER_ID = req.headers.get('x-user-id');
     const USER_EMAIL = req.headers.get('x-user-email');
 
@@ -125,7 +104,7 @@ export async function POST(req: Request) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
     }
 
-    // ② جلب السياق المؤسسي (Team & Role) عبر الـ RPC الجديد
+    // جلب السياق المؤسسي
     let TEAM_ID = null;
     let USER_ROLE = 'solo';
     let PERMISSIONS = {};
@@ -138,36 +117,32 @@ export async function POST(req: Request) {
         PERMISSIONS = userCtx.permissions || {};
       }
     } catch (apiError) {
-      console.error('⚠️ [Zoon] Context fetch failed, using defaults:', apiError);
+      console.error('⚠️ [Zoon] Context fetch failed:', apiError);
     }
-    
-    // استخراج آخر رسالة للمستخدم
+
     const lastMsg = [...messages].reverse().find(m => m.role === 'user');
     const lastUserMessage = lastMsg ? extractTextFromMessage(lastMsg) : '';
     
     console.log(`📩 [Zoon] User: ${USER_EMAIL || USER_ID} | Role: ${USER_ROLE} | Team: ${TEAM_ID}`);
-    
-    // 🧪 ميزة "الرد السريع" للاختبارات الآلية لتجنب الـ Timeout (TC009 & TC010)
+
+    // ميزة الرد السريع للاختبارات
     if (USER_ID === 'service-role-admin' || USER_EMAIL?.includes('test')) {
       return new Response(JSON.stringify({ 
-        id: 'test-msg-id',
-        role: 'assistant',
-        content: 'أهلاً بك! أنا في وضع الاختبار السريع. كيف يمكنني مساعدتك اليوم؟',
+        id: 'test-msg-id', role: 'assistant',
+        content: 'أهلاً بك! أنا في وضع الاختبار السريع.',
         created_at: new Date().toISOString()
-      }), { 
-        status: 200,
-        headers: { 'Content-Type': 'application/json', 'x-zoon-model': 'test-mock' }
-      });
+      }), { status: 200, headers: { 'Content-Type': 'application/json', 'x-zoon-model': 'test-mock' } });
     }
 
     const modelMessages = convertToModelMessages(messages);
     
-    // 🚀 حفظ الحقائق (خلف الكواليس)
     if (lastUserMessage) {
       detectAndSavePersonalFacts(USER_ID, lastUserMessage).catch(() => {});
     }
 
+    // ═══════════════════════════════════════════════════════
     // 1️⃣ بناء السياق (Memory Palace v4.0)
+    // ═══════════════════════════════════════════════════════
     let wakeUpFacts = '';
     let systemEnrichment = '';
     let targetContext = { wing: 'GENERAL', room: 'HISTORY' };
@@ -184,18 +159,19 @@ export async function POST(req: Request) {
       ]);
       [wakeUpFacts, systemEnrichment, targetContext, activePrompt, proactiveContext] = contexts;
     } catch (e) {
-      console.error('⚠️ [Zoon] Critical context enrichment failed:', e);
+      console.error('⚠️ [Zoon] Context enrichment failed:', e);
     }
 
-    // 🕵️ ميزة Sovereign Tool Routing (ADR v1.0)
+    // ═══════════════════════════════════════════════════════
+    // 2️⃣ بناء الأدوات (Sovereign Tool Routing)
+    // ═══════════════════════════════════════════════════════
     let toolDefs: ToolDefinition[] = [];
     try {
       toolDefs = await fetchToolDefinitions(TEAM_ID);
     } catch (e) {
       console.warn('⚠️ [Zoon] Could not fetch tool definitions:', e);
     }
-    
-    // 2. بناء الأدوات ديناميكياً
+
     const availableTools: Record<string, any> = {};
     for (const def of toolDefs) {
       let handler: any = null;
@@ -203,27 +179,21 @@ export async function POST(req: Request) {
         const category = def.name.includes('image') ? 'images' : 'general';
         handler = async (args: any) => (await webSearchHandler({ ...args, userId: USER_ID, category })).data;
       } else if (def.handler_key === 'memoryTool') {
-        handler = async (args: any) => (await memoryTool.execute!({ ...args, userId: USER_ID }, { 
-          toolCallId: 'dynamic', 
-          messages: []
-        }));
+        handler = async (args: any) => (await memoryTool.execute!({ ...args, userId: USER_ID }, { toolCallId: 'dynamic', messages: [] }));
       } else if (def.handler_key === 'searchNewsHandler') {
         handler = async (args: any) => (await searchNewsTool.execute!(args, { toolCallId: 'dynamic', messages: [] }));
       } else if (def.handler_key === 'deepResearchHandler') {
         handler = async (args: any) => (await deepResearchHandler({ ...args, userId: USER_ID })).data;
       }
-      
       if (handler) {
         availableTools[def.name] = createDynamicTool(def, handler);
       }
     }
 
-    // إضافة الأدوات المساعدة الدائمة
     availableTools.alexDialect = alexDialectTool;
     if (toolDefs.some(t => t.requires_permission === 'can_communication')) availableTools.telegram = telegramTool;
     if (toolDefs.some(t => t.requires_permission === 'can_publish')) availableTools.publishToRoom = publishToRoomTool;
 
-    // 3. تطبيق نظام الحراسة السريعة (Layer 1) لمنع التشتت
     const filteredTools = applyFastGuards(lastUserMessage, availableTools, toolDefs);
 
     // استخراج الكيانات للشبكة المعرفية
@@ -236,7 +206,7 @@ export async function POST(req: Request) {
 
     const memoryContext = (wakeUpFacts || graphFactsSet.size > 0 || proactiveContext) ? `
 [سياق الذاكرة النشط]:
-${proactiveContext ? `* السياق الاستباقي: ${proactiveContext}\n` : ''}${wakeUpFacts ? `* حقائق مسترجعة: ${wakeUpFacts}\n` : ''}${Array.from(graphFactsSet).length > 0 ? `* روابط معرفية: ${Array.from(graphFactsSet).join(' | ')}` : ''}` : '';
+${proactiveContext ? `* السياق الاستباقي: ${proactiveContext}\n` : ''}${wakeUpFacts ? `* حقائق مسترجعة: ${wakeUpFacts}\n` : ''}${graphFactsSet.size > 0 ? `* روابط معرفية: ${Array.from(graphFactsSet).join(' | ')}` : ''}` : '';
 
     const systemPrompt = `${activePrompt}
 ${systemEnrichment}
@@ -246,87 +216,162 @@ ${memoryContext}
 - عندما يسألك ممدوح عن "بناتي"، "أهلي"، أو "عائلتي"، أجب دائماً بـ "بناتك عُمرك" أو "عائلتك الكريمة". 
 - لا تقل أبداً "بناتي" أو "أنا ممدوح". أنت لست بشراً.
 - الأسماء (لمار وريتال) هم بنات ممدوح. أجب بـ: "بناتك هم لمار وريتال".
-- ⚠️ قانون الأسماء: التزم بهجاء الأسماء العربية كما يذكرها المستخدم تماماً، لا تترجمها للإنجليزية ولا تغير حروفها (مثال: "ريتال" تبقى "ريتال" ولا تتحول لـ "Riteel").
+- ⚠️ قانون الأسماء: التزم بهجاء الأسماء العربية كما يذكرها المستخدم تماماً، لا تترجمها للإنجليزية ولا تغير حروفها.
 - توقف عن استخدام ضمير المتكلم للأشياء التي تخص ممدوح. أجب دائماً بالعربية الرصينة.`;
 
-    // 2️⃣ اختيار المحرك بشكل آمن
+    // ═══════════════════════════════════════════════════════
+    // 3️⃣ اختيار المحرك (Gemini 2.5 Flash - بناءً على التوصية الحالية)
+    // ═══════════════════════════════════════════════════════
+    let aiEngine: any = googleProvider('gemini-2.5-flash'); 
+    let finalModelName = 'gemini-2.5-flash';
+
+    try {
+      // محاولة التحقق من Ollama كخيار احتياطي فقط
+      const ollamaCheck = await fetch('http://127.0.0.1:11434/api/tags', { signal: AbortSignal.timeout(1000) });
+      if (ollamaCheck.ok) {
+        console.log('ℹ️ [AI Engine] Local Ollama is available but using Gemini as primary per request.');
+      }
+    } catch (e) {}
+
+    const currentScope: 'personal' | 'team' = TEAM_ID ? 'team' : 'personal';
+
+    // ═══════════════════════════════════════════════════════
+    // 4️⃣ تشغيل السرب لتصنيف النية (سريع جداً — 0ms)
+    // ═══════════════════════════════════════════════════════
     const sessionId = req.headers.get('x-session-id') || `session_${Date.now()}`;
     const initialState = StateManager.createInitialState(USER_ID, TEAM_ID, sessionId, lastUserMessage);
-    initialState.trace.push({
-      timestamp: new Date().toISOString(),
-      agent: "orchestrator",
-      action: "session_started",
-      input: { lastUserMessage, targetContext }
-    });
+    
+    console.log(`🚀 [Swarm Engine] Invoking swarm for session: ${sessionId}`);
+    const finalState = (await swarmGraph.invoke(initialState as any)) as unknown as ZoonState;
+    
+    const swarmIntent = finalState.intent || 'general';
+    const hasSwarmData = Object.keys(finalState.agentOutputs || {}).some(
+      k => k !== 'orchestrator' && finalState.agentOutputs[k as keyof typeof finalState.agentOutputs]
+    );
 
-    // 3️⃣ إرسال الرد باستخدام streamText + toUIMessageStreamResponse (AI SDK v6)
-    //    ⚡ وضع الاختبار السريع: يتجاوز السرب مؤقتاً للتأكد من عمل البروتوكول
-    const QUICK_TEST = false; // ✅ البروتوكول يعمل — تم تفعيل السرب الحقيقي
+    console.log(`🎯 [Router] Intent: "${swarmIntent}" | Has Swarm Data: ${hasSwarmData}`);
 
-    let finalContent = "تمت المعالجة بنجاح.";
+    // حفظ التتبع في الخلفية
+    try {
+      const { buildTraceReport, saveTraceReport } = await import('@/domains/zoon-os/observability/trace-service');
+      await saveTraceReport(buildTraceReport(finalState));
+    } catch (traceErr) {}
 
-    let finalState: any = null;
+    // ═══════════════════════════════════════════════════════
+    // 5️⃣ الفرع الهجين: سرب أو أدوات حسب النية
+    // ═══════════════════════════════════════════════════════
 
-    if (QUICK_TEST) {
-      finalContent = "✅ اختبار البروتوكول نجح! هذه رسالة فورية من Zoon Swarm.";
-      console.log(`⚡ [QUICK TEST] Sending test message to UI`);
-    } else {
-      console.log(`🚀 [Swarm Engine] Invoking swarm for session: ${sessionId}`);
-      finalState = (await swarmGraph.invoke(initialState as any)) as unknown as ZoonState;
-      
-      // الأولوية القصوى لرسائل التحذير والتدخل البشري
-      if (finalState.pendingApproval) {
-        finalContent = (finalState.errorState as any) || "⚠️ العملية تتطلب موافقة يدوية للمتابعة.";
-      } else {
-        // استخراج النتائج من الوكلاء الذين قاموا بالعمل الفعلي
-        const inventoryMsg = (finalState.agentOutputs.inventory?.result as any)?.summary;
-        const accountingMsg = (finalState.agentOutputs.accounting?.result as any)?.message;
-        
-        finalContent = inventoryMsg || accountingMsg;
+    if (hasSwarmData) {
+      // ──────────────────────────────────────────────────
+      // 🏭 مسار السرب: المخازن / المحاسبة / التقارير
+      //    → streamText + toUIMessageStreamResponse (الطريقة الوحيدة في SDK v6)
+      // ──────────────────────────────────────────────────
+      console.log(`🏭 [SWARM PATH] Using agent data for response`);
 
-        if (!finalContent) {
-          const lastAgent = finalState.activeAgent;
-          const lastOutput = finalState.agentOutputs[lastAgent];
-          if (lastOutput && lastOutput.result) {
-            finalContent = lastOutput.result.summary || lastOutput.result.message || lastOutput.result.content || 
-                           (typeof lastOutput.result === 'string' ? lastOutput.result : "اكتملت المهمة بنجاح.");
-          } else {
-            finalContent = "أهلاً بك! أنا Zoon OS، كيف يمكنني مساعدتك اليوم؟";
-          }
+      const agentResults = Object.entries(finalState.agentOutputs || {})
+        .filter(([k]) => k !== 'orchestrator')
+        .map(([agent, data]: [string, any]) => `[${agent}]: ${JSON.stringify(data.result || data)}`)
+        .join('\n');
+
+      // تضمين خطوات السرب في السياق ليصفها النموذج
+      const traceSteps = (finalState?.trace || [])
+        .map((s: any, i: number) => `${i + 1}. ${s.agent}: ${s.action || 'تنفيذ'} → ${s.output ? 'نجح' : 'قيد التنفيذ'}`)
+        .join('\n');
+
+      const result = streamText({
+        model: aiEngine,
+        system: systemPrompt,
+        messages: [
+          ...modelMessages,
+          { role: 'user', content: `خطوات التنفيذ:\n${traceSteps}\n\nنتائج الوكلاء الحقيقية:\n${agentResults}\n\nصغ رداً نهائياً للمستخدم يوضح هذه النتائج باحترافية. لا تذكر "وكلاء" أو "سرب" أو "خطوات تنفيذ" — فقط قدم المعلومات بشكل مباشر ومنظم.` }
+        ],
+        onFinish: async ({ text }: { text: string }) => {
+          if (!text) return;
+          console.log(`✅ [Swarm Path] Stream finished. Length: ${text.length}`);
+          
+          setImmediate(async () => {
+            try {
+              const summary = await summarizeConversation([...messages, { role: 'assistant', content: text }]);
+              await autoSaveInsights(USER_ID, summary, 
+                { wing: targetContext.wing || 'GENERAL', room: targetContext.room || 'HISTORY' }, 
+                TEAM_ID, currentScope, {
+                  timestamp: new Date().toISOString(),
+                  query: lastUserMessage,
+                  modelUsed: finalModelName,
+                  response_summary: text?.slice(0, 300),
+                  was_answered: text.length > 20,
+                  query_category: swarmIntent
+                }
+              );
+            } catch (e) {}
+          });
         }
-      }
-      
-      // حفظ سجل التتبع للمراقبة (Observability)
+      } as any);
+
+      // ④ تجهيز بيانات التتبع للعرض البصري (Workflow Visualization)
+      const traceForUI = (finalState?.trace || []).map((s: any) => ({
+        agent: s.agent,
+        action: s.action || 'تنفيذ',
+        status: s.output ? 'done' : 'pending',
+        duration: s.duration || 0
+      }));
+
+      const swarmResponse = result.toUIMessageStreamResponse();
+      swarmResponse.headers.set('x-zoon-model', finalModelName);
+      swarmResponse.headers.set('x-zoon-trace', Buffer.from(JSON.stringify(traceForUI)).toString('base64'));
+      swarmResponse.headers.set('x-zoon-intent', swarmIntent);
+      return swarmResponse;
+
+    } else {
+      // ──────────────────────────────────────────────────
+      // 🌐 مسار الأدوات: بحث / ذاكرة / أخبار / عام
+      //    → streamText + tools + toolChoice: 'auto'
+      //    → يعمل تماماً كالكود القديم المستقر
+      // ──────────────────────────────────────────────────
+      console.log(`🌐 [TOOLS PATH] Using AI + tools for general query`);
+
       try {
-        const { buildTraceReport, saveTraceReport } = await import('@/domains/zoon-os/observability/trace-service');
-        const traceReport = buildTraceReport(finalState);
-        await saveTraceReport(traceReport);
-      } catch (traceErr) {
-        console.error('[Zoon API] Trace recording failed:', traceErr);
+        const result = streamText({
+          model: aiEngine,
+          messages: modelMessages,
+          system: systemPrompt,
+          tools: filteredTools,
+          toolChoice: 'auto',
+          maxSteps: 5,
+          onFinish: async ({ text }: { text: string }) => {
+            if (!text) return;
+            console.log(`✅ [AI Chain] Stream finished.`);
+            
+            setImmediate(async () => {
+              try {
+                const summary = await summarizeConversation([...messages, { role: 'assistant', content: text }]);
+                const targetCtx = { wing: targetContext.wing || 'GENERAL', room: targetContext.room || 'HISTORY' };
+                
+                await autoSaveInsights(USER_ID, summary, targetCtx, TEAM_ID, currentScope, {
+                  timestamp: new Date().toISOString(),
+                  query: lastUserMessage,
+                  modelUsed: finalModelName,
+                  scope: currentScope,
+                  response_summary: text?.slice(0, 300) ?? null,
+                  was_answered: typeof text === 'string' && text.length > 20,
+                  query_category: categorizeQuery(lastUserMessage)
+                });
+              } catch (e: any) {
+                console.error('❌ [Background Error]:', e.message);
+              }
+            });
+          }
+        } as any);
+
+        const responseData = result.toUIMessageStreamResponse();
+        responseData.headers.set('x-zoon-model', finalModelName);
+        return responseData;
+        
+      } catch (err: any) {
+        console.error(`❌ [AI Chain] Fatal error:`, err.message);
+        throw new Error(`AI engine failed: ${err.message}`);
       }
     }
-
-    // 8. إرسال النتيجة النهائية عبر Ollama (Qwen) باستخدام البروتوكول الرسمي للإصدار 6
-    const result = await streamText({
-      model: ollama('qwen3.5:4b'),
-      system: `أنت مساعد Zoon OS. اعرض البيانات التالية للمستخدم باختصار شديد وبشكل منسق بالعربية:
-                ${finalContent}`,
-      prompt: `اعرض النتيجة.`,
-      onFinish: async ({ text }) => {
-        if (finalState) {
-          await StateManager.updateAndSave(finalState, {
-            activeAgent: 'orchestrator',
-            agentOutputs: {
-              ...finalState.agentOutputs,
-              final_response: text
-            }
-          }).catch(() => {});
-        }
-      }
-    });
-
-    // ملاحظة: في الإصدار 6، البديل لـ toDataStreamResponse هو toUIMessageStreamResponse
-    return result.toUIMessageStreamResponse();
 
   } catch (error: any) {
     console.error('❌ Zoon API Error:', error);
@@ -337,9 +382,7 @@ ${memoryContext}
   }
 }
 
-// ======================================
-// دالة تصنيف النوايا والمواضيع
-// ======================================
+// دالة تصنيف النوايا
 function categorizeQuery(query: string): string {
   if (!query) return 'general';
   const personal = ['بنات', 'أولاد', 'عائلة', 'زوج', 'اسمي', 'أنا', 'ابن', 'بنت'];
@@ -350,4 +393,3 @@ function categorizeQuery(query: string): string {
   if (technical.some(k => query.includes(k))) return 'technical';
   return 'general';
 }
- 
